@@ -337,6 +337,7 @@
             </div>
             
             <button class="btn btn-success" onclick="createMasterPassword()" id="createBtn">Create Vault</button>
+            <button class="btn" onclick="switchToLogin()">I Already Have a Vault</button>
             <button class="btn btn-danger" onclick="resetConfig()">Reset Configuration</button>
         </div>
 
@@ -353,6 +354,7 @@
             </div>
             
             <button class="btn" onclick="authenticate()" id="unlockBtn">Unlock Vault</button>
+            <button class="btn" onclick="switchToCreate()">Create New Vault</button>
             <button class="btn btn-danger" onclick="resetConfig()">Reset Configuration</button>
         </div>
 
@@ -539,6 +541,18 @@
             } finally {
                 githubConfig = originalConfig; // Restore original config
             }
+        }
+
+        function switchToLogin() {
+            document.getElementById('createPasswordSection').style.display = 'none';
+            document.getElementById('authSection').classList.remove('hidden');
+            updateSyncStatus('🔐 Ready to unlock', 'sync-offline');
+        }
+
+        function switchToCreate() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('createPasswordSection').classList.remove('hidden');
+            updateSyncStatus('🆕 Ready to create vault', 'sync-offline');
         }
 
         // Encryption functions (same as before)
