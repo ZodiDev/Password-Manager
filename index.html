@@ -406,6 +406,17 @@
             const savedConfig = localStorage.getItem('githubConfig');
             if (savedConfig) {
                 githubConfig = JSON.parse(savedConfig);
+                
+                // Trim any saved config that might have spaces
+                githubConfig.username = githubConfig.username.trim();
+                githubConfig.repo = githubConfig.repo.trim();
+                githubConfig.token = githubConfig.token.trim();
+                
+                // Save the cleaned config back
+                localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+                
+                console.log('Loaded and cleaned GitHub config:', githubConfig);
+                
                 document.getElementById('setupSection').style.display = 'none';
                 document.getElementById('authSection').classList.remove('hidden');
             }
@@ -469,6 +480,7 @@
         async function githubApiCall(endpoint, method = 'GET', data = null) {
             const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/${endpoint}`;
             
+            console.log(`GitHub Config:`, githubConfig);
             console.log(`Making GitHub API call: ${method} ${url}`);
             
             const options = {
