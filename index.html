@@ -311,6 +311,11 @@
             </div>
 
             <button class="btn btn-success" onclick="saveGitHubConfig()">Save Configuration</button>
+            <div style="margin-top: 15px;">
+                <small style="color: #7f8c8d;">
+                    Having trouble? <a href="#" onclick="skipGitHubCheck()" style="color: #3498db;">Skip GitHub check and create vault manually</a>
+                </small>
+            </div>
         </div>
 
         <!-- Create Master Password (First Time) -->
@@ -464,6 +469,8 @@
         async function githubApiCall(endpoint, method = 'GET', data = null) {
             const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/${endpoint}`;
             
+            console.log(`Making GitHub API call: ${method} ${url}`);
+            
             const options = {
                 method,
                 headers: {
@@ -479,8 +486,12 @@
 
             const response = await fetch(url, options);
             
+            console.log(`GitHub API response: ${response.status} ${response.statusText}`);
+            
             if (!response.ok) {
-                throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('GitHub API error details:', errorText);
+                throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
             return response.json();
