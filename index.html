@@ -523,6 +523,15 @@
 
                 // All tests passed!
                 alert(`✅ Connection successful!\n\nRepository: ${repoData.full_name}\nPrivate: ${repoData.private ? 'Yes' : 'No (⚠️ Consider making it private)'}\nPermissions: Read ✓ Write ✓\n\nYou can now save your configuration!`);
+                
+                // Auto-save the configuration since the test passed
+                githubConfig = testConfig;
+                localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+                
+                // Hide setup section and show create password section
+                document.getElementById('setupSection').style.display = 'none';
+                document.getElementById('createPasswordSection').classList.remove('hidden');
+                updateSyncStatus('🆕 Ready to create vault', 'sync-offline');
 
             } catch (error) {
                 console.error('Connection test failed:', error);
