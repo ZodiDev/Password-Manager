@@ -1576,6 +1576,7 @@
             let isHolding = false;
             let isPasswordRevealed = false;
             let hasMoved = false;
+            let isVerticalScroll = false;
 
             // Mouse events
             element.addEventListener('mousedown', handleStart);
@@ -1584,7 +1585,7 @@
             element.addEventListener('mouseleave', handleEnd);
 
             // Touch events
-            element.addEventListener('touchstart', handleStart, { passive: false });
+            element.addEventListener('touchstart', handleStart, { passive: true });
             element.addEventListener('touchmove', handleMove, { passive: false });
             element.addEventListener('touchend', handleEnd);
             element.addEventListener('touchcancel', handleEnd);
@@ -1598,17 +1599,13 @@
                 isTouch = e.type === 'touchstart';
                 isHolding = true;
                 hasMoved = false;
+                isVerticalScroll = false;
                 
                 element.classList.add('swiping');
                 
-                // Prevent context menu and selection for touch devices
-                if (isTouch) {
-                    e.preventDefault();
-                }
-                
                 // Start hold timer for password reveal (1 second)
                 holdTimer = setTimeout(() => {
-                    if (isHolding && !hasMoved && !isDragging) {
+                    if (isHolding && !hasMoved && !isDragging && !isVerticalScroll) {
                         passwordDisplay.classList.remove('hidden');
                         isPasswordRevealed = true;
                         // Add slight vibration on mobile if supported
@@ -1625,13 +1622,47 @@
                 const point = e.touches ? e.touches[0] : e;
                 const deltaX = point.clientX - startX;
                 const deltaY = point.clientY - startY;
-                const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
-                // If user moves more than 15px, mark as moved/dragging
-                if (totalMovement > 15) {
+                // Determine direction of movement early
+                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
                     hasMoved = true;
                     
-                    // Cancel hold timer and hide password if revealed
+                    // Determine if this is primarily vertical scrolling
+                    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) {
+                        isVerticalScroll = true;
+                        // Allow normal scrolling - don't prevent default
+                        if (holdTimer) {
+                            clearTimeout(holdTimer);
+                            holdTimer = null;
+                        }
+                        if (isPasswordRevealed) {
+                            passwordDisplay.classList.add('hidden');
+                            isPasswordRevealed = false;
+                        }
+                        return; // Exit early to allow normal scroll
+                    }
+                    
+                    // Horizontal swipe detection (for delete on mobile)
+                    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
+                        isDragging = true;
+                        
+                        // Only handle horizontal swipe on mobile/touch devices
+                        if (isTouch && window.innerWidth <= 768) {
+                            e.preventDefault(); // Only prevent default for horizontal swipes
+                            
+                            currentX = Math.min(0, deltaX); // Only allow left swipe
+                            element.style.transform = `translateX(${currentX}px)`;
+                            
+                            // Show delete indicator when swiped far enough
+                            if (currentX < -60) {
+                                element.classList.add('delete-ready');
+                            } else {
+                                element.classList.remove('delete-ready');
+                            }
+                        }
+                    }
+                    
+                    // Cancel hold timer for any significant movement
                     if (holdTimer) {
                         clearTimeout(holdTimer);
                         holdTimer = null;
@@ -1640,29 +1671,6 @@
                         passwordDisplay.classList.add('hidden');
                         isPasswordRevealed = false;
                     }
-                }
-                
-                // Determine if this is a horizontal swipe vs vertical scroll
-                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
-                    isDragging = true;
-                    
-                    // Only handle swipe on mobile/touch devices
-                    if (isTouch && window.innerWidth <= 768) {
-                        e.preventDefault(); // Prevent scrolling during swipe
-                        
-                        currentX = Math.min(0, deltaX); // Only allow left swipe
-                        element.style.transform = `translateX(${currentX}px)`;
-                        
-                        // Show delete indicator when swiped far enough
-                        if (currentX < -60) {
-                            element.classList.add('delete-ready');
-                        } else {
-                            element.classList.remove('delete-ready');
-                        }
-                    }
-                } else if (Math.abs(deltaY) > 20 && !isDragging) {
-                    // Allow vertical scrolling, but mark as moved to prevent copy
-                    hasMoved = true;
                 }
             }
 
@@ -1696,8 +1704,8 @@
                 element.style.transform = 'translateX(0)';
                 element.classList.remove('delete-ready');
                 
-                // Handle click-to-copy (only if not dragging/moving and didn't reveal password)
-                if (!isDragging && !hasMoved && !isPasswordRevealed) {
+                // Handle click-to-copy (only if it was a quick tap without movement or scrolling)
+                if (!hasMoved && !isDragging && !isVerticalScroll && !isPasswordRevealed) {
                     copyToClipboard(password, 'password');
                 }
                 
@@ -1707,6 +1715,7 @@
                 isDragging = false;
                 isTouch = false;
                 hasMoved = false;
+                isVerticalScroll = false;
             }
         }
 
