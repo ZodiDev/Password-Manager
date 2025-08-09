@@ -296,18 +296,16 @@
         }
 
         .quick-actions {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 6px;
             margin-top: 10px;
-            flex-wrap: wrap;
         }
 
         .quick-actions .btn {
-            flex: 1;
-            min-width: 0;
+            margin-bottom: 0;
             font-size: 0.8rem;
             padding: 8px 10px;
-            margin-bottom: 0;
         }
 
         .search-container {
@@ -316,17 +314,7 @@
         }
 
         .search-input {
-            padding-left: 40px;
             background: rgba(255, 255, 255, 0.9);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6c757d;
-            font-size: 1.1rem;
         }
 
         .clear-search {
@@ -353,37 +341,6 @@
         .strength-medium { background: linear-gradient(90deg, #f39c12, #e67e22); }
         .strength-strong { background: linear-gradient(90deg, #27ae60, #229954); }
 
-        .password-stats {
-            text-align: center;
-            padding: 15px;
-            background: rgba(52, 152, 219, 0.1);
-            border-radius: 10px;
-            margin-bottom: 15px;
-            color: #2c3e50;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-top: 10px;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #3498db;
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            opacity: 0.8;
-        }
-
         .loading {
             text-align: center;
             padding: 40px 20px;
@@ -400,14 +357,6 @@
             font-size: 3rem;
             margin-bottom: 15px;
             opacity: 0.6;
-        }
-
-        .last-sync {
-            text-align: center;
-            font-size: 0.8rem;
-            color: #6c757d;
-            margin-top: 10px;
-            padding: 5px 0;
         }
 
         .steps {
@@ -481,20 +430,11 @@
             }
 
             .quick-actions {
-                flex-direction: column;
-            }
-
-            .quick-actions .btn {
-                flex: none;
+                grid-template-columns: 1fr 1fr;
             }
 
             .password-item {
                 padding: 12px;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
             }
         }
 
@@ -521,22 +461,37 @@
                 color: #e9ecef;
             }
 
+            .password-item h3 {
+                color: #e9ecef !important;
+            }
+
+            .password-item p {
+                color: #cbd5e0 !important;
+            }
+
             .add-form {
                 background: rgba(55, 65, 81, 0.8);
             }
 
             .password-display {
                 background: rgba(75, 85, 99, 0.8);
-                color: #e9ecef;
-            }
-
-            .password-stats {
-                background: rgba(52, 152, 219, 0.2);
-                color: #e9ecef;
+                color: #e9ecef !important;
             }
 
             label {
                 color: #e9ecef;
+            }
+
+            .info {
+                background: rgba(59, 130, 246, 0.2);
+                color: #dbeafe;
+                border-left: 4px solid #3b82f6;
+            }
+
+            .warning {
+                background: rgba(245, 158, 11, 0.2);
+                color: #fef3c7;
+                border-left: 4px solid #f59e0b;
             }
         }
     </style>
@@ -642,26 +597,6 @@
 
         <!-- Main Password Manager -->
         <div class="section-mobile hidden" id="mainSection">
-            <!-- Stats Overview -->
-            <div class="password-stats">
-                <strong>Your Password Vault</strong>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-number" id="totalPasswords">0</div>
-                        <div class="stat-label">Passwords</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="strongPasswords">0</div>
-                        <div class="stat-label">Strong</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="recentAdded">0</div>
-                        <div class="stat-label">Recent</div>
-                    </div>
-                </div>
-                <div class="last-sync" id="lastSyncTime">Last sync: Never</div>
-            </div>
-
             <!-- Add New Password -->
             <div class="add-form">
                 <h3>➕ Add New Password</h3>
@@ -697,12 +632,18 @@
                 </div>
             </div>
 
-            <!-- Search -->
+            <!-- Search & Import -->
             <div class="search-container">
-                <span class="search-icon">🔍</span>
                 <input type="text" class="search-input" id="searchInput" placeholder="Search passwords..." oninput="filterPasswords()">
                 <button class="clear-search hidden" id="clearSearch" onclick="clearSearch()">✕</button>
             </div>
+            
+            <div class="btn-row" style="margin-bottom: 15px;">
+                <button class="btn btn-secondary" onclick="document.getElementById('csvImport').click()">📥 Import CSV</button>
+                <button class="btn btn-secondary" onclick="exportCSV()">📤 Export CSV</button>
+            </div>
+            
+            <input type="file" id="csvImport" accept=".csv" style="display: none;" onchange="handleCSVImport()">
 
             <!-- Passwords List -->
             <div id="passwordsList">
@@ -1085,10 +1026,142 @@
         }
 
         function updateLastSyncTime() {
-            const element = document.getElementById('lastSyncTime');
-            if (lastSyncTime) {
-                element.textContent = `Last sync: ${lastSyncTime.toLocaleTimeString()}`;
+            // Removed - no longer showing sync time
+        }
+
+        // CSV Import/Export Functions
+        async function handleCSVImport() {
+            const file = document.getElementById('csvImport').files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const importedPasswords = parseCSV(text);
+                
+                if (importedPasswords.length === 0) {
+                    alert('No valid passwords found in CSV file');
+                    return;
+                }
+
+                const confirmMessage = `Import ${importedPasswords.length} passwords?\n\nThis will add them to your existing passwords (duplicates may occur).`;
+                
+                if (!confirm(confirmMessage)) return;
+
+                // Add imported passwords to existing ones
+                passwords.push(...importedPasswords);
+                
+                await savePasswordsToGitHub();
+                displayPasswords();
+                
+                showCopyFeedback(`✅ Imported ${importedPasswords.length} passwords!`);
+            } catch (error) {
+                console.error('CSV import failed:', error);
+                alert('Failed to import CSV file. Please check the format.');
             }
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            
+            // Find column indices
+            const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('site'));
+            const websiteIndex = headers.findIndex(h => h.includes('website') || h.includes('url'));
+            const usernameIndex = headers.findIndex(h => h.includes('username') || h.includes('email'));
+            const passwordIndex = headers.findIndex(h => h.includes('password'));
+            
+            if (nameIndex === -1 || usernameIndex === -1 || passwordIndex === -1) {
+                throw new Error('Required columns not found. Need: name/site, username/email, password');
+            }
+
+            const passwords = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const columns = parseCSVLine(line);
+                
+                if (columns.length <= Math.max(nameIndex, usernameIndex, passwordIndex)) continue;
+                
+                const siteName = columns[nameIndex]?.trim();
+                const username = columns[usernameIndex]?.trim();
+                const password = columns[passwordIndex]?.trim();
+                
+                if (!siteName || !username || !password) continue;
+                
+                const passwordEntry = {
+                    siteName,
+                    username,
+                    password,
+                    dateAdded: new Date().toISOString()
+                };
+                
+                // Add website URL if available
+                if (websiteIndex !== -1 && columns[websiteIndex]) {
+                    let url = columns[websiteIndex].trim();
+                    if (url && !url.startsWith('http')) {
+                        url = 'https://' + url;
+                    }
+                    passwordEntry.siteUrl = url;
+                }
+                
+                passwords.push(passwordEntry);
+            }
+            
+            return passwords;
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current);
+            return result;
+        }
+
+        function exportCSV() {
+            if (passwords.length === 0) {
+                alert('No passwords to export');
+                return;
+            }
+
+            const csvContent = [
+                'name,website,username,password,notes',
+                ...passwords.map(p => {
+                    const name = (p.siteName || '').replace(/,/g, '');
+                    const website = (p.siteUrl || '').replace(/,/g, '');
+                    const username = (p.username || '').replace(/,/g, '');
+                    const password = (p.password || '').replace(/,/g, '');
+                    const notes = `Added: ${new Date(p.dateAdded).toLocaleDateString()}`;
+                    
+                    return `"${name}","${website}","${username}","${password}","${notes}"`;
+                })
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `passwords-export-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showCopyFeedback('📤 CSV exported!');
         }
 
         async function createMasterPassword() {
@@ -1128,7 +1201,6 @@
                 document.getElementById('confirmMasterPassword').value = '';
                 
                 displayPasswords();
-                updateStats();
             } catch (error) {
                 alert('Failed to create vault. Please try again.');
                 console.error(error);
@@ -1160,7 +1232,6 @@
                 document.getElementById('masterPassword').value = '';
                 
                 displayPasswords();
-                updateStats();
             } catch (error) {
                 alert('Failed to unlock vault. Please check your master password.');
                 console.error(error);
@@ -1170,18 +1241,47 @@
             }
         }
 
-        function updateStats() {
-            const total = passwords.length;
-            const strong = passwords.filter(p => p.password && p.password.length >= 12 && /[A-Z]/.test(p.password) && /[0-9]/.test(p.password)).length;
-            const recent = passwords.filter(p => {
-                const addedDate = new Date(p.dateAdded);
-                const daysDiff = (new Date() - addedDate) / (1000 * 60 * 60 * 24);
-                return daysDiff <= 7;
-            }).length;
+        async function addPassword() {
+            const siteName = document.getElementById('siteName').value.trim();
+            const siteUrl = document.getElementById('siteUrl').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
 
-            document.getElementById('totalPasswords').textContent = total;
-            document.getElementById('strongPasswords').textContent = strong;
-            document.getElementById('recentAdded').textContent = recent;
+            if (!siteName || !username || !password) {
+                alert('Please fill in site name, username, and password');
+                return;
+            }
+
+            const addBtn = document.getElementById('addBtn');
+            addBtn.disabled = true;
+            addBtn.innerHTML = '💾 Saving...';
+
+            try {
+                passwords.push({
+                    siteName,
+                    siteUrl,
+                    username,
+                    password,
+                    dateAdded: new Date().toISOString()
+                });
+
+                await savePasswordsToGitHub();
+                displayPasswords();
+
+                // Clear form
+                document.getElementById('siteName').value = '';
+                document.getElementById('siteUrl').value = '';
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+
+                showCopyFeedback('✅ Password saved!');
+            } catch (error) {
+                alert('Failed to save password. Please try again.');
+                passwords.pop();
+            } finally {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '💾 Save';
+            }
         }
 
         function displayPasswords() {
@@ -1259,66 +1359,6 @@
             }, 2000);
         }
 
-        async function addPassword() {
-            const siteName = document.getElementById('siteName').value.trim();
-            const siteUrl = document.getElementById('siteUrl').value.trim();
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-
-            if (!siteName || !username || !password) {
-                alert('Please fill in site name, username, and password');
-                return;
-            }
-
-            const addBtn = document.getElementById('addBtn');
-            addBtn.disabled = true;
-            addBtn.innerHTML = '💾 Saving...';
-
-            try {
-                passwords.push({
-                    siteName,
-                    siteUrl,
-                    username,
-                    password,
-                    dateAdded: new Date().toISOString()
-                });
-
-                await savePasswordsToGitHub();
-                displayPasswords();
-                updateStats();
-
-                // Clear form
-                document.getElementById('siteName').value = '';
-                document.getElementById('siteUrl').value = '';
-                document.getElementById('username').value = '';
-                document.getElementById('password').value = '';
-
-                showCopyFeedback('✅ Password saved!');
-            } catch (error) {
-                alert('Failed to save password. Please try again.');
-                passwords.pop();
-            } finally {
-                addBtn.disabled = false;
-                addBtn.innerHTML = '💾 Save';
-            }
-        }
-
-        async function deletePassword(index) {
-            if (!confirm(`Delete password for ${passwords[index].siteName}?`)) return;
-
-            const deletedPassword = passwords.splice(index, 1)[0];
-            
-            try {
-                await savePasswordsToGitHub();
-                displayPasswords();
-                updateStats();
-                showCopyFeedback('🗑️ Password deleted');
-            } catch (error) {
-                alert('Failed to delete password. Please try again.');
-                passwords.splice(index, 0, deletedPassword);
-            }
-        }
-
         function generatePassword() {
             const length = 16;
             const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -1366,7 +1406,6 @@
             try {
                 await loadPasswordsFromGitHub();
                 displayPasswords();
-                updateStats();
                 showCopyFeedback('🔄 Synced successfully!');
             } catch (error) {
                 alert('Sync failed. Please check your internet connection.');
