@@ -1729,19 +1729,38 @@
                 const siteName = passwords[index].siteName;
                 if (!confirm(`Delete password for ${siteName}?`)) return;
 
+                // Remove from array immediately to update UI
                 const deletedPassword = passwords.splice(index, 1)[0];
                 
-                await savePasswordsToGitHub();
+                // Update display immediately
                 displayPasswords();
+                
+                // Update filtered passwords if search is active
+                if (filteredPasswords.length > 0) {
+                    const filteredIndex = filteredPasswords.indexOf(deletedPassword);
+                    if (filteredIndex > -1) {
+                        filteredPasswords.splice(filteredIndex, 1);
+                    }
+                }
+                
+                // Show feedback immediately
                 showCopyFeedback('🗑️ Password deleted');
+                
+                // Try to save to GitHub in background
+                try {
+                    await savePasswordsToGitHub();
+                } catch (saveError) {
+                    console.error('Failed to sync deletion to GitHub:', saveError);
+                    // Restore the password if GitHub save failed
+                    passwords.splice(index, 0, deletedPassword);
+                    displayPasswords();
+                    showCopyFeedback('❌ Delete failed - restored');
+                    throw saveError;
+                }
+                
             } catch (error) {
                 console.error('Delete failed:', error);
                 alert('Failed to delete password. Please try again.');
-                // Restore the password if it was removed
-                if (typeof deletedPassword !== 'undefined') {
-                    passwords.splice(index, 0, deletedPassword);
-                    displayPasswords();
-                }
             }
         }
 
