@@ -996,6 +996,7 @@
                 const encrypted = await encrypt(dataToEncrypt, masterKey);
                 const encryptedContent = JSON.stringify(encrypted);
                 
+                // Always fetch the latest SHA to avoid conflicts
                 let sha = null;
                 try {
                     const existingFile = await githubApiCall('contents/passwords.json');
@@ -1020,6 +1021,29 @@
             } catch (error) {
                 console.error('Failed to save to GitHub:', error);
                 updateSyncStatus('🔴 Sync Error', 'sync-offline');
+                
+                // If it's a SHA conflict, try once more with fresh SHA
+                if (error.message.includes('409') || error.message.includes('does not match')) {
+                    console.log('SHA conflict detected, retrying with fresh SHA...');
+                    try {
+                        const freshFile = await githubApiCall('contents/passwords.json');
+                        const commitData = {
+                            message: `Update passwords - ${new Date().toISOString()} (retry)`,
+                            content: btoa(JSON.stringify(await encrypt(JSON.stringify(passwords), masterKey))),
+                            sha: freshFile.sha
+                        };
+                        
+                        await githubApiCall('contents/passwords.json', 'PUT', commitData);
+                        lastSyncTime = new Date();
+                        updateSyncStatus('🟢 Synced', 'sync-online');
+                        updateLastSyncTime();
+                        return; // Success on retry
+                    } catch (retryError) {
+                        console.error('Retry also failed:', retryError);
+                        updateSyncStatus('🔴 Sync Error', 'sync-offline');
+                    }
+                }
+                
                 throw error;
             }
         }
@@ -1060,45 +1084,64 @@
             if (!file) return;
 
             try {
+                console.log('Starting CSV import...');
+                
+                // First sync to get latest data and avoid conflicts
+                console.log('Syncing before import...');
+                await loadPasswordsFromGitHub();
+                
                 const text = await file.text();
+                console.log('File content loaded, parsing...');
+                
                 const importedPasswords = parseCSV(text);
                 
                 if (importedPasswords.length === 0) {
-                    alert('No valid passwords found in CSV file');
+                    alert('No valid passwords found in CSV file.\n\nExpected format:\nname,website,username,secondary_username,password,notes');
                     return;
                 }
 
-                const confirmMessage = `Import ${importedPasswords.length} passwords?\n\nThis will add them to your existing passwords (duplicates may occur).`;
+                const confirmMessage = `Import ${importedPasswords.length} passwords?\n\nThis will add them to your existing passwords.`;
                 
                 if (!confirm(confirmMessage)) return;
 
+                console.log('User confirmed import, adding passwords...');
+                
                 // Add imported passwords to existing ones
+                const originalLength = passwords.length;
                 passwords.push(...importedPasswords);
                 
+                console.log('Saving to GitHub...');
                 await savePasswordsToGitHub();
+                
+                console.log('Refreshing display...');
                 displayPasswords();
                 
                 showCopyFeedback(`✅ Imported ${importedPasswords.length} passwords!`);
+                console.log(`Successfully imported ${importedPasswords.length} passwords`);
+                
             } catch (error) {
                 console.error('CSV import failed:', error);
-                alert('Failed to import CSV file. Please check the format.');
+                alert(`Failed to import CSV file: ${error.message}\n\nPlease check that your CSV follows this format:\nname,website,username,secondary_username,password,notes`);
             }
         }
 
         function parseCSV(csvText) {
             const lines = csvText.trim().split('\n');
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-            
-            // Find column indices
-            const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('site'));
-            const websiteIndex = headers.findIndex(h => h.includes('website') || h.includes('url'));
-            const usernameIndex = headers.findIndex(h => h.includes('username') || h.includes('email'));
-            const passwordIndex = headers.findIndex(h => h.includes('password'));
-            
-            if (nameIndex === -1 || usernameIndex === -1 || passwordIndex === -1) {
-                throw new Error('Required columns not found. Need: name/site, username/email, password');
+            if (lines.length < 2) {
+                throw new Error('CSV file must have at least a header and one data row');
             }
-
+            
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            console.log('CSV Headers found:', headers);
+            
+            // Your format: name,website,username,secondary_username,password,notes
+            // Map to expected positions
+            const nameIndex = 0;      // name
+            const websiteIndex = 1;   // website  
+            const usernameIndex = 2;  // username
+            const passwordIndex = 4;  // password (skip secondary_username at index 3)
+            const notesIndex = 5;     // notes (optional)
+            
             const passwords = [];
             
             for (let i = 1; i < lines.length; i++) {
@@ -1106,14 +1149,22 @@
                 if (!line) continue;
                 
                 const columns = parseCSVLine(line);
+                console.log(`Processing row ${i}:`, columns);
                 
-                if (columns.length <= Math.max(nameIndex, usernameIndex, passwordIndex)) continue;
+                if (columns.length < 5) {
+                    console.warn(`Skipping row ${i}: not enough columns (need at least 5, got ${columns.length})`);
+                    continue;
+                }
                 
                 const siteName = columns[nameIndex]?.trim();
+                const website = columns[websiteIndex]?.trim();
                 const username = columns[usernameIndex]?.trim();
                 const password = columns[passwordIndex]?.trim();
                 
-                if (!siteName || !username || !password) continue;
+                if (!siteName || !username || !password) {
+                    console.warn(`Skipping row ${i}: missing required fields`, { siteName, username, password: password ? '[present]' : '[missing]' });
+                    continue;
+                }
                 
                 const passwordEntry = {
                     siteName,
@@ -1123,8 +1174,8 @@
                 };
                 
                 // Add website URL if available
-                if (websiteIndex !== -1 && columns[websiteIndex]) {
-                    let url = columns[websiteIndex].trim();
+                if (website) {
+                    let url = website;
                     if (url && !url.startsWith('http')) {
                         url = 'https://' + url;
                     }
@@ -1132,8 +1183,10 @@
                 }
                 
                 passwords.push(passwordEntry);
+                console.log(`Added password for: ${siteName}`);
             }
             
+            console.log(`Successfully parsed ${passwords.length} passwords from CSV`);
             return passwords;
         }
 
@@ -1148,14 +1201,14 @@
                 if (char === '"') {
                     inQuotes = !inQuotes;
                 } else if (char === ',' && !inQuotes) {
-                    result.push(current);
+                    result.push(current.trim());
                     current = '';
                 } else {
                     current += char;
                 }
             }
             
-            result.push(current);
+            result.push(current.trim());
             return result;
         }
 
