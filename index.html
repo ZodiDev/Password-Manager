@@ -441,14 +441,19 @@
             }
 
             input, textarea {
-                background: rgba(55, 65, 81, 0.9);
-                color: #e9ecef;
-                border-color: #4a5568;
+                background: rgba(75, 85, 99, 0.9) !important;
+                color: #f1f5f9 !important;
+                border-color: #64748b;
             }
 
             input:focus, textarea:focus {
-                background: #4a5568;
+                background: rgba(51, 65, 85, 0.95) !important;
                 border-color: #3498db;
+                color: #f1f5f9 !important;
+            }
+
+            input::placeholder, textarea::placeholder {
+                color: #94a3b8 !important;
             }
 
             .password-item {
@@ -592,8 +597,13 @@
 
         <!-- Main Password Manager -->
         <div class="section-mobile hidden" id="mainSection">
-            <!-- Add New Password -->
-            <div class="add-form">
+            <!-- Add New Password Button -->
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button class="btn btn-success" onclick="toggleAddForm()" id="toggleAddBtn">➕ Add New Password</button>
+            </div>
+
+            <!-- Add New Password Form (Initially Hidden) -->
+            <div class="add-form hidden" id="addPasswordForm">
                 <h3>➕ Add New Password</h3>
                 
                 <div class="form-row">
@@ -1024,6 +1034,26 @@
             // Removed - no longer showing sync time
         }
 
+        // Toggle add form visibility
+        function toggleAddForm() {
+            const form = document.getElementById('addPasswordForm');
+            const btn = document.getElementById('toggleAddBtn');
+            
+            if (form.classList.contains('hidden')) {
+                form.classList.remove('hidden');
+                btn.textContent = '➖ Hide Add Form';
+            } else {
+                form.classList.add('hidden');
+                btn.textContent = '➕ Add New Password';
+                
+                // Clear form when hiding
+                document.getElementById('siteName').value = '';
+                document.getElementById('siteUrl').value = '';
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            }
+        }
+
         // CSV Import/Export Functions
         async function handleCSVImport() {
             const file = document.getElementById('csvImport').files[0];
@@ -1312,19 +1342,46 @@
                         <strong>🔑</strong> ${item.password}
                     </div>
                     <div class="quick-actions">
-                        <button class="btn btn-secondary" onclick="togglePassword(${actualIndex})">👁️ Show</button>
-                        <button class="btn btn-secondary" onclick="copyToClipboard('${item.password}', 'password')">📋 Pass</button>
-                        <button class="btn btn-secondary" onclick="copyToClipboard('${item.username}', 'username')">📋 User</button>
-                        <button class="btn btn-danger" onclick="deletePassword(${actualIndex})">🗑️</button>
+                        <button class="btn btn-secondary" data-action="toggle" data-index="${actualIndex}">👁️ Show</button>
+                        <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
+                        <button class="btn btn-secondary" data-action="copy-username" data-value="${item.username}">📋 User</button>
+                        <button class="btn btn-danger" data-action="delete" data-index="${actualIndex}">🗑️</button>
                     </div>
                 `;
+                
+                // Add event listeners to buttons
+                const buttons = div.querySelectorAll('button[data-action]');
+                buttons.forEach(button => {
+                    button.addEventListener('click', handlePasswordAction);
+                });
+                
                 container.appendChild(div);
             });
         }
 
-        function togglePassword(index) {
+        function handlePasswordAction(event) {
+            const action = event.target.dataset.action;
+            const index = parseInt(event.target.dataset.index);
+            const value = event.target.dataset.value;
+            
+            switch (action) {
+                case 'toggle':
+                    togglePassword(index, event.target);
+                    break;
+                case 'copy-password':
+                    copyToClipboard(value, 'password');
+                    break;
+                case 'copy-username':
+                    copyToClipboard(value, 'username');
+                    break;
+                case 'delete':
+                    deletePasswordSafe(index);
+                    break;
+            }
+        }
+
+        function togglePassword(index, button) {
             const element = document.getElementById(`pass-${index}`);
-            const button = event.target;
             
             if (element.classList.contains('hidden')) {
                 element.classList.remove('hidden');
@@ -1332,6 +1389,32 @@
             } else {
                 element.classList.add('hidden');
                 button.textContent = '👁️ Show';
+            }
+        }
+
+        async function deletePasswordSafe(index) {
+            try {
+                if (!passwords[index]) {
+                    alert('Password not found');
+                    return;
+                }
+                
+                const siteName = passwords[index].siteName;
+                if (!confirm(`Delete password for ${siteName}?`)) return;
+
+                const deletedPassword = passwords.splice(index, 1)[0];
+                
+                await savePasswordsToGitHub();
+                displayPasswords();
+                showCopyFeedback('🗑️ Password deleted');
+            } catch (error) {
+                console.error('Delete failed:', error);
+                alert('Failed to delete password. Please try again.');
+                // Restore the password if it was removed
+                if (deletedPassword) {
+                    passwords.splice(index, 0, deletedPassword);
+                    displayPasswords();
+                }
             }
         }
 
