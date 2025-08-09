@@ -298,6 +298,7 @@
         .quick-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
             gap: 6px;
             margin-top: 10px;
         }
@@ -306,6 +307,34 @@
             margin-bottom: 0;
             font-size: 0.8rem;
             padding: 8px 10px;
+        }
+
+        .passwords-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        /* Responsive grid for password items */
+        @media (min-width: 768px) {
+            .passwords-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .passwords-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+            }
+        }
+
+        @media (min-width: 1400px) {
+            .passwords-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+            }
         }
 
         .search-container {
@@ -1058,6 +1087,8 @@
             // Removed - no longer showing sync time
         }
 
+        async function createMasterPassword() {
+
         // Toggle add form visibility
         function toggleAddForm() {
             const form = document.getElementById('addPasswordForm');
@@ -1377,7 +1408,10 @@
                 return;
             }
 
-            container.innerHTML = '';
+            // Create grid container
+            const gridContainer = document.createElement('div');
+            gridContainer.className = 'passwords-grid';
+            
             toShow.forEach((item, index) => {
                 const actualIndex = passwords.indexOf(item);
                 const firstLetter = item.siteName.charAt(0).toUpperCase();
@@ -1389,15 +1423,14 @@
                         <span class="site-icon">${firstLetter}</span>
                         ${item.siteName}
                     </h3>
-                    ${item.siteUrl ? `<p><strong>🌐</strong> <a href="${item.siteUrl}" target="_blank" style="color: #3498db;">${item.siteUrl.replace(/^https?:\/\//, '')}</a></p>` : ''}
                     <p><strong>👤</strong> ${item.username}</p>
                     <div class="password-display hidden" id="pass-${actualIndex}">
                         <strong>🔑</strong> ${item.password}
                     </div>
                     <div class="quick-actions">
-                        <button class="btn btn-secondary" data-action="toggle" data-index="${actualIndex}">👁️ Show</button>
-                        <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
                         <button class="btn btn-secondary" data-action="copy-username" data-value="${item.username}">📋 User</button>
+                        <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
+                        <button class="btn btn-secondary" data-action="toggle" data-index="${actualIndex}">👁️ Show</button>
                         <button class="btn btn-danger" data-action="delete" data-index="${actualIndex}">🗑️</button>
                     </div>
                 `;
@@ -1408,8 +1441,11 @@
                     button.addEventListener('click', handlePasswordAction);
                 });
                 
-                container.appendChild(div);
+                gridContainer.appendChild(div);
             });
+            
+            container.innerHTML = '';
+            container.appendChild(gridContainer);
         }
 
         function handlePasswordAction(event) {
