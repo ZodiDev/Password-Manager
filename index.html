@@ -219,11 +219,79 @@
             border: 1px solid rgba(0,0,0,0.05);
             transition: all 0.3s ease;
             position: relative;
+            cursor: pointer;
+            user-select: none;
+            transform: translateX(0);
         }
 
         .password-item:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .password-item.swiping {
+            transition: none;
+        }
+
+        .password-item.delete-ready {
+            background: rgba(231, 76, 60, 0.1);
+            border-color: rgba(231, 76, 60, 0.3);
+        }
+
+        .delete-icon {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background: rgba(231, 76, 60, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 10;
+        }
+
+        .password-item:hover .delete-icon {
+            opacity: 1;
+        }
+
+        .delete-icon:hover {
+            background: rgba(231, 76, 60, 1);
+            transform: scale(1.1);
+        }
+
+        .swipe-indicator {
+            position: absolute;
+            right: -60px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .password-item.delete-ready .swipe-indicator {
+            opacity: 1;
+        }
+
+        /* Hide delete icon on mobile */
+        @media (max-width: 768px) {
+            .delete-icon {
+                display: none;
+            }
         }
 
         .password-item h3 {
@@ -295,24 +363,10 @@
             margin-bottom: 0;
         }
 
-        .quick-actions {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 6px;
-            margin-top: 10px;
-        }
-
-        .quick-actions .btn {
-            margin-bottom: 0;
-            font-size: 0.8rem;
-            padding: 8px 10px;
-        }
-
         .passwords-grid {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
         }
 
         .search-container {
@@ -431,10 +485,6 @@
                 margin-bottom: 12px;
             }
 
-            .quick-actions {
-                grid-template-columns: 1fr 1fr;
-            }
-
             .password-item {
                 padding: 12px;
             }
@@ -466,6 +516,11 @@
             .password-item {
                 background: rgba(55, 65, 81, 0.9);
                 color: #e9ecef;
+            }
+
+            .password-item.delete-ready {
+                background: rgba(231, 76, 60, 0.2);
+                border-color: rgba(231, 76, 60, 0.5);
             }
 
             .password-item h3 {
@@ -1467,7 +1522,10 @@
                 
                 const div = document.createElement('div');
                 div.className = 'password-item';
+                div.dataset.index = actualIndex;
                 div.innerHTML = `
+                    <button class="delete-icon" title="Delete password">🗑️</button>
+                    <div class="swipe-indicator">Release to delete</div>
                     <h3>
                         <span class="site-icon">${firstLetter}</span>
                         ${item.siteName}
@@ -1476,19 +1534,13 @@
                     <div class="password-display hidden" id="pass-${actualIndex}">
                         <strong>🔑</strong> ${item.password}
                     </div>
-                    <div class="quick-actions">
-                        <button class="btn btn-secondary" data-action="copy-username" data-value="${item.username}">📋 User</button>
-                        <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
-                        <button class="btn btn-secondary" data-action="toggle" data-index="${actualIndex}">👁️ Show</button>
-                        <button class="btn btn-danger" data-action="delete" data-index="${actualIndex}">🗑️</button>
-                    </div>
+                    <p style="color: #7f8c8d; font-size: 0.8rem; margin-top: 8px;">
+                        💡 Click to copy • Hold to reveal
+                    </p>
                 `;
                 
-                // Add event listeners to buttons
-                const buttons = div.querySelectorAll('button[data-action]');
-                buttons.forEach(button => {
-                    button.addEventListener('click', handlePasswordAction);
-                });
+                // Add interaction handlers
+                setupPasswordItemInteractions(div, actualIndex, item.password);
                 
                 gridContainer.appendChild(div);
             });
@@ -1497,36 +1549,139 @@
             container.appendChild(gridContainer);
         }
 
-        function handlePasswordAction(event) {
-            const action = event.target.dataset.action;
-            const index = parseInt(event.target.dataset.index);
-            const value = event.target.dataset.value;
+        function setupPasswordItemInteractions(element, index, password) {
+            const deleteBtn = element.querySelector('.delete-icon');
+            const passwordDisplay = element.querySelector('.password-display');
             
-            switch (action) {
-                case 'toggle':
-                    togglePassword(index, event.target);
-                    break;
-                case 'copy-password':
-                    copyToClipboard(value, 'password');
-                    break;
-                case 'copy-username':
-                    copyToClipboard(value, 'username');
-                    break;
-                case 'delete':
-                    deletePasswordSafe(index);
-                    break;
-            }
-        }
+            // Desktop delete button
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deletePasswordSafe(index);
+            });
 
-        function togglePassword(index, button) {
-            const element = document.getElementById(`pass-${index}`);
-            
-            if (element.classList.contains('hidden')) {
-                element.classList.remove('hidden');
-                button.textContent = '🙈 Hide';
-            } else {
-                element.classList.add('hidden');
-                button.textContent = '👁️ Show';
+            // Touch/Mouse interaction variables
+            let startX = 0;
+            let startY = 0;
+            let currentX = 0;
+            let isDragging = false;
+            let isTouch = false;
+            let holdTimer = null;
+            let isHolding = false;
+            let isPasswordRevealed = false;
+
+            // Mouse events
+            element.addEventListener('mousedown', handleStart);
+            element.addEventListener('mousemove', handleMove);
+            element.addEventListener('mouseup', handleEnd);
+            element.addEventListener('mouseleave', handleEnd);
+
+            // Touch events
+            element.addEventListener('touchstart', handleStart, { passive: false });
+            element.addEventListener('touchmove', handleMove, { passive: false });
+            element.addEventListener('touchend', handleEnd);
+
+            function handleStart(e) {
+                const point = e.touches ? e.touches[0] : e;
+                startX = point.clientX;
+                startY = point.clientY;
+                currentX = 0;
+                isDragging = false;
+                isTouch = e.type === 'touchstart';
+                isHolding = true;
+                
+                element.classList.add('swiping');
+                
+                // Start hold timer for password reveal (1.5 seconds)
+                holdTimer = setTimeout(() => {
+                    if (isHolding && !isDragging) {
+                        passwordDisplay.classList.remove('hidden');
+                        isPasswordRevealed = true;
+                        // Add slight vibration on mobile if supported
+                        if (navigator.vibrate && isTouch) {
+                            navigator.vibrate(50);
+                        }
+                    }
+                }, 1500);
+            }
+
+            function handleMove(e) {
+                if (!startX) return;
+                
+                const point = e.touches ? e.touches[0] : e;
+                const deltaX = point.clientX - startX;
+                const deltaY = point.clientY - startY;
+                
+                // If user moves too much, cancel hold timer and hide password
+                if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                    if (holdTimer) {
+                        clearTimeout(holdTimer);
+                        holdTimer = null;
+                    }
+                    if (isPasswordRevealed) {
+                        passwordDisplay.classList.add('hidden');
+                        isPasswordRevealed = false;
+                    }
+                }
+                
+                // Determine if this is a horizontal swipe vs vertical scroll
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+                    isDragging = true;
+                    
+                    // Only handle swipe on mobile/touch devices
+                    if (isTouch && window.innerWidth <= 768) {
+                        e.preventDefault(); // Prevent scrolling during swipe
+                        
+                        currentX = Math.min(0, deltaX); // Only allow left swipe
+                        element.style.transform = `translateX(${currentX}px)`;
+                        
+                        // Show delete indicator when swiped far enough
+                        if (currentX < -60) {
+                            element.classList.add('delete-ready');
+                        } else {
+                            element.classList.remove('delete-ready');
+                        }
+                    }
+                }
+            }
+
+            function handleEnd(e) {
+                if (!startX) return;
+                
+                isHolding = false;
+                element.classList.remove('swiping');
+                
+                // Clear hold timer
+                if (holdTimer) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
+                }
+                
+                // Hide password when releasing
+                if (isPasswordRevealed) {
+                    passwordDisplay.classList.add('hidden');
+                    isPasswordRevealed = false;
+                }
+                
+                // Handle swipe-to-delete on mobile
+                if (isTouch && window.innerWidth <= 768 && currentX < -100) {
+                    deletePasswordSafe(index);
+                    return;
+                }
+                
+                // Reset position
+                element.style.transform = 'translateX(0)';
+                element.classList.remove('delete-ready');
+                
+                // Handle click-to-copy (only if not dragging and wasn't holding for password reveal)
+                if (!isDragging || Math.abs(currentX) < 10) {
+                    copyToClipboard(password, 'password');
+                }
+                
+                // Reset values
+                startX = 0;
+                currentX = 0;
+                isDragging = false;
+                isTouch = false;
             }
         }
 
@@ -1559,9 +1714,24 @@
         async function copyToClipboard(text, type) {
             try {
                 await navigator.clipboard.writeText(text);
-                showCopyFeedback(type === 'password' ? '🔑 Password copied!' : '👤 Username copied!');
+                if (type === 'password') {
+                    showCopyFeedback('🔑 Password copied!');
+                } else {
+                    showCopyFeedback('👤 Username copied!');
+                }
             } catch (error) {
-                alert('Failed to copy to clipboard');
+                // Fallback for browsers that don't support clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopyFeedback(type === 'password' ? '🔑 Password copied!' : '👤 Username copied!');
+                } catch (fallbackError) {
+                    alert('Failed to copy to clipboard');
+                }
+                document.body.removeChild(textArea);
             }
         }
 
