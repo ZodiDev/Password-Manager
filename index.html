@@ -1123,7 +1123,12 @@
             } catch (error) {
                 if (error.message.includes('404')) {
                     passwords = [];
-                    await savePasswordsToGitHub();
+                    try {
+                        await savePasswordsToGitHub();
+                    } catch (saveError) {
+                        console.error('Failed to create initial file:', saveError);
+                        updateSyncStatus('🔴 Sync Error', 'sync-offline');
+                    }
                 } else {
                     console.error('Failed to load from GitHub:', error);
                     updateSyncStatus('🔴 Sync Error', 'sync-offline');
@@ -1162,6 +1167,7 @@
                 lastSyncTime = new Date();
                 updateSyncStatus('🟢 Synced', 'sync-online');
                 updateLastSyncTime();
+                
             } catch (error) {
                 console.error('Failed to save to GitHub:', error);
                 updateSyncStatus('🔴 Sync Error', 'sync-offline');
@@ -1881,14 +1887,30 @@
 
                 const deletedPassword = passwords.splice(index, 1)[0];
                 
+                // Remove from new passwords tracking
+                newPasswordsThisSession.delete(index);
+                
+                // Update indices for remaining new passwords
+                const updatedNewPasswords = new Set();
+                newPasswordsThisSession.forEach(idx => {
+                    if (idx > index) {
+                        updatedNewPasswords.add(idx - 1);
+                    } else if (idx < index) {
+                        updatedNewPasswords.add(idx);
+                    }
+                });
+                newPasswordsThisSession = updatedNewPasswords;
+                
                 await savePasswordsToGitHub();
                 displayPasswords();
                 showCopyFeedback('🗑️ Password deleted');
+                
             } catch (error) {
                 console.error('Delete failed:', error);
                 alert('Failed to delete password. Please try again.');
+                
                 // Restore the password if it was removed
-                if (deletedPassword) {
+                if (typeof deletedPassword !== 'undefined') {
                     passwords.splice(index, 0, deletedPassword);
                     displayPasswords();
                 }
