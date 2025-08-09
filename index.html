@@ -365,8 +365,9 @@
 
         .passwords-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 15px;
+            width: 100%;
         }
 
         .search-container {
@@ -1553,6 +1554,12 @@
             const deleteBtn = element.querySelector('.delete-icon');
             const passwordDisplay = element.querySelector('.password-display');
             
+            // Prevent context menu on long press
+            element.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                return false;
+            });
+            
             // Desktop delete button
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1568,6 +1575,7 @@
             let holdTimer = null;
             let isHolding = false;
             let isPasswordRevealed = false;
+            let hasMoved = false;
 
             // Mouse events
             element.addEventListener('mousedown', handleStart);
@@ -1579,6 +1587,7 @@
             element.addEventListener('touchstart', handleStart, { passive: false });
             element.addEventListener('touchmove', handleMove, { passive: false });
             element.addEventListener('touchend', handleEnd);
+            element.addEventListener('touchcancel', handleEnd);
 
             function handleStart(e) {
                 const point = e.touches ? e.touches[0] : e;
@@ -1588,12 +1597,18 @@
                 isDragging = false;
                 isTouch = e.type === 'touchstart';
                 isHolding = true;
+                hasMoved = false;
                 
                 element.classList.add('swiping');
                 
-                // Start hold timer for password reveal (1.5 seconds)
+                // Prevent context menu and selection for touch devices
+                if (isTouch) {
+                    e.preventDefault();
+                }
+                
+                // Start hold timer for password reveal (1 second)
                 holdTimer = setTimeout(() => {
-                    if (isHolding && !isDragging) {
+                    if (isHolding && !hasMoved && !isDragging) {
                         passwordDisplay.classList.remove('hidden');
                         isPasswordRevealed = true;
                         // Add slight vibration on mobile if supported
@@ -1601,7 +1616,7 @@
                             navigator.vibrate(50);
                         }
                     }
-                }, 1500);
+                }, 1000);
             }
 
             function handleMove(e) {
@@ -1610,9 +1625,13 @@
                 const point = e.touches ? e.touches[0] : e;
                 const deltaX = point.clientX - startX;
                 const deltaY = point.clientY - startY;
+                const totalMovement = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
-                // If user moves too much, cancel hold timer and hide password
-                if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                // If user moves more than 15px, mark as moved/dragging
+                if (totalMovement > 15) {
+                    hasMoved = true;
+                    
+                    // Cancel hold timer and hide password if revealed
                     if (holdTimer) {
                         clearTimeout(holdTimer);
                         holdTimer = null;
@@ -1624,7 +1643,7 @@
                 }
                 
                 // Determine if this is a horizontal swipe vs vertical scroll
-                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
                     isDragging = true;
                     
                     // Only handle swipe on mobile/touch devices
@@ -1641,6 +1660,9 @@
                             element.classList.remove('delete-ready');
                         }
                     }
+                } else if (Math.abs(deltaY) > 20 && !isDragging) {
+                    // Allow vertical scrolling, but mark as moved to prevent copy
+                    hasMoved = true;
                 }
             }
 
@@ -1658,8 +1680,10 @@
                 
                 // Hide password when releasing
                 if (isPasswordRevealed) {
-                    passwordDisplay.classList.add('hidden');
-                    isPasswordRevealed = false;
+                    setTimeout(() => {
+                        passwordDisplay.classList.add('hidden');
+                        isPasswordRevealed = false;
+                    }, 100);
                 }
                 
                 // Handle swipe-to-delete on mobile
@@ -1672,8 +1696,8 @@
                 element.style.transform = 'translateX(0)';
                 element.classList.remove('delete-ready');
                 
-                // Handle click-to-copy (only if not dragging and wasn't holding for password reveal)
-                if (!isDragging || Math.abs(currentX) < 10) {
+                // Handle click-to-copy (only if not dragging/moving and didn't reveal password)
+                if (!isDragging && !hasMoved && !isPasswordRevealed) {
                     copyToClipboard(password, 'password');
                 }
                 
@@ -1682,6 +1706,7 @@
                 currentX = 0;
                 isDragging = false;
                 isTouch = false;
+                hasMoved = false;
             }
         }
 
