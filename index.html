@@ -402,7 +402,6 @@
         let passwords = [];
         let githubConfig = null;
 
-        // Check if configuration exists on load
         window.addEventListener('load', () => {
             const savedConfig = localStorage.getItem('githubConfig');
             if (savedConfig) {
@@ -422,6 +421,116 @@
                 document.getElementById('authSection').classList.remove('hidden');
             }
         });
+
+        async function testGitHubConnection() {
+            const username = document.getElementById('githubUsername').value.trim();
+            const repo = document.getElementById('repoName').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+
+            if (!username || !repo || !token) {
+                alert('Please fill in all fields first');
+                return;
+            }
+
+            const testConfig = { username, repo, token };
+            const originalConfig = githubConfig;
+            githubConfig = testConfig; // Temporarily use test config
+
+            try {
+                // Test 1: Check if repo exists and is accessible
+                console.log('Testing repository access...');
+                const repoInfo = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (repoInfo.status === 404) {
+                    alert(`❌ Repository not found!\n\nThe repository "https://github.com/${username}/${repo}" does not exist.\n\nPlease:\n1. Create the repository at github.com/new\n2. Make sure the name matches exactly: "${repo}"\n3. Make it PRIVATE for security`);
+                    githubConfig = originalConfig;
+                    return;
+                }
+
+                if (repoInfo.status === 403) {
+                    alert(`❌ Access denied!\n\nYour token cannot access the repository.\n\nPlease check:\n1. Repository exists: https://github.com/${username}/${repo}\n2. Token has "repo" permissions\n3. Token is not expired`);
+                    githubConfig = originalConfig;
+                    return;
+                }
+
+                if (!repoInfo.ok) {
+                    const errorData = await repoInfo.text();
+                    alert(`❌ Repository access failed: ${repoInfo.status}\n\n${errorData}`);
+                    githubConfig = originalConfig;
+                    return;
+                }
+
+                const repoData = await repoInfo.json();
+                console.log('Repository info:', repoData);
+
+                // Test 2: Try to read repository contents (test read permission)
+                console.log('Testing read permissions...');
+                const contentsResponse = await fetch(`https://api.github.com/repos/${username}/${repo}/contents`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (!contentsResponse.ok) {
+                    alert(`❌ Cannot read repository contents!\n\nStatus: ${contentsResponse.status}\n\nYour token might not have read permissions.`);
+                    githubConfig = originalConfig;
+                    return;
+                }
+
+                // Test 3: Try to create a test file (test write permission)
+                console.log('Testing write permissions...');
+                const testFileContent = btoa('test'); // Base64 encode "test"
+                const writeTestResponse = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.password-manager-test`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Test file for password manager setup',
+                        content: testFileContent
+                    })
+                });
+
+                if (!writeTestResponse.ok) {
+                    const errorData = await writeTestResponse.text();
+                    alert(`❌ Cannot write to repository!\n\nStatus: ${writeTestResponse.status}\n\nError: ${errorData}\n\nYour token needs "repo" (full repository) permissions, not just "public_repo".`);
+                    githubConfig = originalConfig;
+                    return;
+                }
+
+                // Clean up test file
+                const testFileInfo = await writeTestResponse.json();
+                await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.password-manager-test`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Clean up test file',
+                        sha: testFileInfo.content.sha
+                    })
+                });
+
+                // All tests passed!
+                alert(`✅ Connection successful!\n\nRepository: ${repoData.full_name}\nPrivate: ${repoData.private ? 'Yes' : 'No (⚠️ Consider making it private)'}\nPermissions: Read ✓ Write ✓\n\nYou can now save your configuration!`);
+
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                alert(`❌ Connection test failed!\n\nError: ${error.message}\n\nPlease check your internet connection and try again.`);
+            } finally {
+                githubConfig = originalConfig; // Restore original config
+            }
+        }
 
         // Encryption functions (same as before)
         async function deriveKey(password, salt) {
