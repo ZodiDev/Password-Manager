@@ -1,1711 +1,941 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Manager</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 10px;
-            line-height: 1.5;
-        }
-
-        .container {
-            max-width: 450px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        /* Responsive container sizing */
-        @media (min-width: 768px) {
-            .container {
-                max-width: 800px;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .container {
-                max-width: 1200px;
-            }
-        }
-
-        @media (min-width: 1400px) {
-            .container {
-                max-width: 1400px;
-            }
-        }
-
-        .header {
-            background: linear-gradient(135deg, #2c3e50, #34495e);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            position: relative;
-        }
-
-        .header h1 {
-            font-size: 1.4rem;
-            margin-bottom: 5px;
-            font-weight: 700;
-        }
-
-        .header p {
-            font-size: 0.85rem;
-            opacity: 0.9;
-        }
-
-        .sync-status {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-
-        .sync-online {
-            background: rgba(39, 174, 96, 0.9);
-            color: white;
-        }
-
-        .sync-offline {
-            background: rgba(231, 76, 60, 0.9);
-            color: white;
-        }
-
-        .section {
-            padding: 20px;
-        }
-
-        .section-mobile {
-            padding: 15px;
-        }
-
-        .info, .warning {
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            font-size: 0.9rem;
-        }
-
-        .info {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            border-left: 4px solid #2196f3;
-            color: #1565c0;
-        }
-
-        .warning {
-            background: linear-gradient(135deg, #fff3e0, #ffcc02);
-            border-left: 4px solid #ff9800;
-            color: #e65100;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group-compact {
-            margin-bottom: 12px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 0.9rem;
-        }
-
-        .input-container {
-            position: relative;
-        }
-
-        input[type="text"], input[type="password"], input[type="url"], textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-size: 16px; /* Prevents zoom on iOS */
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.9);
-        }
-
-        input:focus, textarea:focus {
-            outline: none;
-            border-color: #3498db;
-            background: white;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-
-        .password-toggle {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.2rem;
-            color: #6c757d;
-            padding: 0;
-            z-index: 2;
-        }
-
-        .password-toggle:hover {
-            color: #3498db;
-        }
-
-        .btn {
-            width: 100%;
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-            border: none;
-            padding: 14px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            margin-bottom: 10px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #27ae60, #229954);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-        }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
-            font-size: 0.9rem;
-            padding: 10px 16px;
-        }
-
-        .btn-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-
-        .btn-row .btn {
-            margin-bottom: 0;
-        }
-
-        .password-item {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 12px;
-            border: 1px solid rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .password-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }
-
-        .password-item.new-password {
-            border-left: 4px solid #27ae60;
-            background: rgba(39, 174, 96, 0.05);
-        }
-
-        .password-item h3 {
-            color: #2c3e50;
-            margin-bottom: 8px;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .password-item .site-icon {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
-        .password-item p {
-            margin: 4px 0;
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .password-display {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            background: rgba(236, 240, 241, 0.8);
-            padding: 8px;
-            border-radius: 6px;
-            word-break: break-all;
-            margin: 8px 0;
-            font-size: 0.9rem;
-            border-left: 3px solid #3498db;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .add-form {
-            background: rgba(248, 249, 250, 0.8);
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(0,0,0,0.05);
-        }
-
-        .add-form h3 {
-            margin-bottom: 15px;
-            color: #2c3e50;
-            font-size: 1.1rem;
-            text-align: center;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-
-        .form-row .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        .quick-actions {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 6px;
-            margin-top: 10px;
-        }
-
-        .quick-actions .btn {
-            margin-bottom: 0;
-            font-size: 0.8rem;
-            padding: 8px 10px;
-        }
-
-        .passwords-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
-        }
-
-        /* Responsive grid for password items */
-        @media (min-width: 768px) {
-            .passwords-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .passwords-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 15px;
-            }
-        }
-
-        @media (min-width: 1400px) {
-            .passwords-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 15px;
-            }
-        }
-
-        .search-container {
-            position: relative;
-            margin-bottom: 15px;
-        }
-
-        .search-input {
-            background: rgba(255, 255, 255, 0.9);
-        }
-
-        .clear-search {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #6c757d;
-            cursor: pointer;
-            padding: 0;
-            font-size: 1.2rem;
-        }
-
-        .password-strength {
-            height: 4px;
-            border-radius: 2px;
-            margin-top: 6px;
-            transition: all 0.3s ease;
-        }
-
-        .strength-weak { background: linear-gradient(90deg, #e74c3c, #c0392b); }
-        .strength-medium { background: linear-gradient(90deg, #f39c12, #e67e22); }
-        .strength-strong { background: linear-gradient(90deg, #27ae60, #229954); }
-
-        .loading {
-            text-align: center;
-            padding: 40px 20px;
-            color: #7f8c8d;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #7f8c8d;
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            opacity: 0.6;
-        }
-
-        .steps {
-            text-align: left;
-            margin: 15px 0;
-        }
-
-        .steps ol {
-            padding-left: 20px;
-        }
-
-        .steps li {
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-        }
-
-        .copy-feedback {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(39, 174, 96, 0.95);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-weight: 600;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .copy-feedback.show {
-            opacity: 1;
-        }
-
-        /* Mobile specific optimizations */
-        @media (max-width: 480px) {
-            body {
-                padding: 5px;
-            }
-
-            .container {
-                border-radius: 15px;
-                max-width: 100%;
-            }
-
-            .header {
-                padding: 15px;
-            }
-
-            .header h1 {
-                font-size: 1.2rem;
-            }
-
-            .section {
-                padding: 15px;
-            }
-
-            .form-row {
-                flex-direction: column;
-                gap: 0;
-            }
-
-            .form-row .form-group {
-                margin-bottom: 12px;
-            }
-
-            .quick-actions {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .password-item {
-                padding: 12px;
-            }
-        }
-
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            .container {
-                background: rgba(45, 52, 65, 0.95);
-                color: #e9ecef;
-            }
-
-            input, textarea {
-                background: rgba(75, 85, 99, 0.9) !important;
-                color: #f1f5f9 !important;
-                border-color: #64748b;
-            }
-
-            input:focus, textarea:focus {
-                background: rgba(51, 65, 85, 0.95) !important;
-                border-color: #3498db;
-                color: #f1f5f9 !important;
-            }
-
-            input::placeholder, textarea::placeholder {
-                color: #94a3b8 !important;
-            }
-
-            .password-item {
-                background: rgba(55, 65, 81, 0.9);
-                color: #e9ecef;
-            }
-
-            .password-item.new-password {
-                border-left: 4px solid #27ae60;
-                background: rgba(39, 174, 96, 0.15);
-            }
-
-            .password-item h3 {
-                color: #e9ecef !important;
-            }
-
-            .password-item p {
-                color: #cbd5e0 !important;
-            }
-
-            .add-form {
-                background: rgba(55, 65, 81, 0.8);
-            }
-
-            .password-display {
-                background: rgba(75, 85, 99, 0.8);
-                color: #e9ecef !important;
-            }
-
-            label {
-                color: #e9ecef;
-            }
-
-            .info {
-                background: rgba(59, 130, 246, 0.2);
-                color: #dbeafe;
-                border-left: 4px solid #3b82f6;
-            }
-
-            .warning {
-                background: rgba(245, 158, 11, 0.2);
-                color: #fef3c7;
-                border-left: 4px solid #f59e0b;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Password Manager</title>
+
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      min-height:100vh;padding:10px;line-height:1.5
+    }
+    .container{max-width:450px;margin:0 auto;background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.1);overflow:hidden;border:1px solid rgba(255,255,255,.2)}
+    @media (min-width:768px){.container{max-width:800px}}
+    @media (min-width:1024px){.container{max-width:1200px}}
+    @media (min-width:1400px){.container{max-width:1400px}}
+    .header{background:linear-gradient(135deg,#2c3e50,#34495e);color:#fff;padding:20px;text-align:center;position:relative}
+    .header h1{font-size:1.4rem;margin-bottom:5px;font-weight:700}
+    .header p{font-size:.85rem;opacity:.9}
+    .sync-status{position:absolute;top:15px;right:15px;padding:4px 8px;border-radius:12px;font-size:.7rem;font-weight:600}
+    .sync-online{background:rgba(39,174,96,.9);color:#fff}
+    .sync-offline{background:rgba(231,76,60,.9);color:#fff}
+    .section{padding:20px}
+    .section-mobile{padding:15px}
+    .info,.warning{padding:12px;border-radius:10px;margin-bottom:15px;font-size:.9rem}
+    .info{background:linear-gradient(135deg,#e3f2fd,#bbdefb);border-left:4px solid #2196f3;color:#1565c0}
+    .warning{background:linear-gradient(135deg,#fff3e0,#ffcc02);border-left:4px solid #ff9800;color:#e65100}
+    .form-group{margin-bottom:15px}
+    .form-group-compact{margin-bottom:12px}
+    label{display:block;margin-bottom:6px;font-weight:600;color:#2c3e50;font-size:.9rem}
+    .input-container{position:relative}
+    input[type="text"],input[type="password"],input[type="url"],textarea{
+      width:100%;padding:12px;border:2px solid #e9ecef;border-radius:10px;font-size:16px;transition:.3s;background:rgba(255,255,255,.9)
+    }
+    input:focus,textarea:focus{outline:none;border-color:#3498db;background:#fff;transform:translateY(-1px);box-shadow:0 4px 12px rgba(52,152,219,.15)}
+    .password-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.2rem;color:#6c757d;padding:0;z-index:2}
+    .password-toggle:hover{color:#3498db}
+    .btn{width:100%;background:linear-gradient(135deg,#3498db,#2980b9);color:#fff;border:none;padding:14px 20px;border-radius:10px;cursor:pointer;font-size:1rem;font-weight:600;transition:.3s;margin-bottom:10px;position:relative;overflow:hidden}
+    .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 25px rgba(52,152,219,.3)}
+    .btn:active{transform:translateY(0)}
+    .btn:disabled{opacity:.7;cursor:not-allowed;transform:none!important}
+    .btn-primary{background:linear-gradient(135deg,#3498db,#2980b9)}
+    .btn-success{background:linear-gradient(135deg,#27ae60,#229954)}
+    .btn-danger{background:linear-gradient(135deg,#e74c3c,#c0392b)}
+    .btn-secondary{background:linear-gradient(135deg,#95a5a6,#7f8c8d);font-size:.9rem;padding:10px 16px}
+    .btn-row{display:flex;gap:8px;margin-bottom:10px}
+    .btn-row .btn{margin-bottom:0}
+    .password-item{background:rgba(255,255,255,.9);border-radius:12px;padding:15px;margin-bottom:12px;border:1px solid rgba(0,0,0,.05);transition:.3s;position:relative}
+    .password-item:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.1)}
+    .password-item.new-password{border-left:4px solid #27ae60;background:rgba(39,174,96,.05)}
+    .password-item h3{color:#2c3e50;margin-bottom:8px;font-size:1.1rem;display:flex;align-items:center;gap:8px}
+    .password-item .site-icon{width:20px;height:20px;border-radius:4px;background:linear-gradient(135deg,#3498db,#2980b9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.8rem;font-weight:bold}
+    .password-item p{margin:4px 0;color:#6c757d;font-size:.9rem}
+    .password-display{font-family:Monaco,Menlo,'Ubuntu Mono',monospace;background:rgba(236,240,241,.8);padding:8px;border-radius:6px;word-break:break-all;margin:8px 0;font-size:.9rem;border-left:3px solid #3498db}
+    .hidden{display:none!important}
+    .add-form{background:rgba(248,249,250,.8);padding:15px;border-radius:12px;margin-bottom:20px;border:1px solid rgba(0,0,0,.05)}
+    .add-form h3{margin-bottom:15px;color:#2c3e50;font-size:1.1rem;text-align:center}
+    .form-row{display:flex;gap:10px;margin-bottom:12px}
+    .form-row .form-group{flex:1;margin-bottom:0}
+    .quick-actions{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;margin-top:10px}
+    .quick-actions .btn{margin-bottom:0;font-size:.8rem;padding:8px 10px}
+    .passwords-grid{display:grid;grid-template-columns:1fr;gap:12px}
+    @media (min-width:768px){.passwords-grid{grid-template-columns:repeat(2,1fr);gap:15px}}
+    @media (min-width:1024px){.passwords-grid{grid-template-columns:repeat(3,1fr);gap:15px}}
+    @media (min-width:1400px){.passwords-grid{grid-template-columns:repeat(4,1fr);gap:15px}}
+    .search-container{position:relative;margin-bottom:15px}
+    .search-input{background:rgba(255,255,255,.9)}
+    .clear-search{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6c757d;cursor:pointer;padding:0;font-size:1.2rem}
+    .password-strength{height:4px;border-radius:2px;margin-top:6px;transition:.3s}
+    .strength-weak{background:linear-gradient(90deg,#e74c3c,#c0392b)}
+    .strength-medium{background:linear-gradient(90deg,#f39c12,#e67e22)}
+    .strength-strong{background:linear-gradient(90deg,#27ae60,#229954)}
+    .loading,.empty-state{text-align:center;padding:40px 20px;color:#7f8c8d}
+    .empty-state-icon{font-size:3rem;margin-bottom:15px;opacity:.6}
+    .steps{text-align:left;margin:15px 0}
+    .steps ol{padding-left:20px}
+    .steps li{margin-bottom:8px;font-size:.9rem}
+    .copy-feedback{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(39,174,96,.95);color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;z-index:1000;opacity:0;transition:opacity .3s}
+    .copy-feedback.show{opacity:1}
+    @media (max-width:480px){
+      body{padding:5px}
+      .container{border-radius:15px;max-width:100%}
+      .header{padding:15px}
+      .header h1{font-size:1.2rem}
+      .section{padding:15px}
+      .form-row{flex-direction:column;gap:0}
+      .form-row .form-group{margin-bottom:12px}
+      .quick-actions{grid-template-columns:1fr 1fr}
+      .password-item{padding:12px}
+    }
+    @media (prefers-color-scheme:dark){
+      .container{background:rgba(45,52,65,.95);color:#e9ecef}
+      input,textarea{background:rgba(75,85,99,.9)!important;color:#f1f5f9!important;border-color:#64748b}
+      input:focus,textarea:focus{background:rgba(51,65,85,.95)!important;border-color:#3498db;color:#f1f5f9!important}
+      input::placeholder,textarea::placeholder{color:#94a3b8!important}
+      .password-item{background:rgba(55,65,81,.9);color:#e9ecef}
+      .password-item.new-password{border-left:4px solid #27ae60;background:rgba(39,174,96,.15)}
+      .password-item h3{color:#e9ecef!important}
+      .password-item p{color:#cbd5e0!important}
+      .add-form{background:rgba(55,65,81,.8)}
+      .password-display{background:rgba(75,85,99,.8);color:#e9ecef!important}
+      label{color:#e9ecef}
+      .info{background:rgba(59,130,246,.2);color:#dbeafe;border-left:4px solid #3b82f6}
+      .warning{background:rgba(245,158,11,.2);color:#fef3c7;border-left:4px solid #f59e0b}
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🔐 Password Manager</h1>
-            <p>Secure • Synced • Simple</p>
-            <div class="sync-status sync-offline" id="syncStatus">⚫ Offline</div>
-        </div>
-
-        <!-- GitHub Setup -->
-        <div class="section" id="setupSection">
-            <div class="warning">
-                <strong>⚠️ First Time Setup</strong><br>
-                Configure GitHub sync to access your passwords anywhere.
-            </div>
-
-            <div class="steps">
-                <h4>Quick Setup:</h4>
-                <ol>
-                    <li>Create a <strong>private</strong> GitHub repository</li>
-                    <li>Generate a token with <strong>"Contents: Read and write"</strong> permissions</li>
-                    <li>Enter details below</li>
-                </ol>
-            </div>
-
-            <div class="form-group-compact">
-                <label for="githubUsername">GitHub Username</label>
-                <input type="text" id="githubUsername" placeholder="your-username">
-            </div>
-
-            <div class="form-group-compact">
-                <label for="repoName">Repository Name</label>
-                <input type="text" id="repoName" placeholder="my-passwords">
-            </div>
-
-            <div class="form-group-compact">
-                <label for="githubToken">Access Token</label>
-                <div class="input-container">
-                    <input type="password" id="githubToken" placeholder="github_pat_...">
-                    <button class="password-toggle" onclick="togglePasswordVisibility('githubToken')">👁️</button>
-                </div>
-            </div>
-
-            <button class="btn btn-success" onclick="saveGitHubConfig()">🚀 Save & Connect</button>
-            <button class="btn btn-secondary" onclick="testGitHubConnection()">🔍 Test Connection</button>
-            
-            <div style="text-align: center; margin-top: 15px;">
-                <small style="color: #7f8c8d;">
-                    Need help? <a href="#" onclick="skipGitHubCheck()" style="color: #3498db;">Skip verification</a>
-                </small>
-            </div>
-        </div>
-
-        <!-- Create Master Password -->
-        <div class="section hidden" id="createPasswordSection">
-            <div class="info">
-                <strong>🔐 Create Master Password</strong><br>
-                This encrypts all your passwords. Make it strong and memorable!
-            </div>
-            
-            <div class="form-group-compact">
-                <label for="newMasterPassword">Master Password</label>
-                <div class="input-container">
-                    <input type="password" id="newMasterPassword" placeholder="Create a strong password" onkeypress="if(event.key==='Enter') createMasterPassword()" oninput="checkPasswordStrength(this.value)">
-                    <button class="password-toggle" onclick="togglePasswordVisibility('newMasterPassword')">👁️</button>
-                </div>
-                <div class="password-strength" id="strengthIndicator"></div>
-            </div>
-            
-            <div class="form-group-compact">
-                <label for="confirmMasterPassword">Confirm Password</label>
-                <div class="input-container">
-                    <input type="password" id="confirmMasterPassword" placeholder="Confirm your password" onkeypress="if(event.key==='Enter') createMasterPassword()">
-                    <button class="password-toggle" onclick="togglePasswordVisibility('confirmMasterPassword')">👁️</button>
-                </div>
-            </div>
-            
-            <button class="btn btn-success" onclick="createMasterPassword()" id="createBtn">🔑 Create Vault</button>
-            <button class="btn btn-secondary" onclick="switchToLogin()">Already Have a Vault</button>
-        </div>
-
-        <!-- Login -->
-        <div class="section hidden" id="authSection">
-            <div class="info">
-                <strong>🔐 Welcome Back</strong><br>
-                Enter your master password to unlock your vault.
-            </div>
-            
-            <div class="form-group-compact">
-                <label for="masterPassword">Master Password</label>
-                <div class="input-container">
-                    <input type="password" id="masterPassword" placeholder="Enter your master password" onkeypress="if(event.key==='Enter') authenticate()">
-                    <button class="password-toggle" onclick="togglePasswordVisibility('masterPassword')">👁️</button>
-                </div>
-            </div>
-            
-            <button class="btn btn-primary" onclick="authenticate()" id="unlockBtn">🔓 Unlock Vault</button>
-            <button class="btn btn-secondary" onclick="switchToCreate()">Create New Vault</button>
-        </div>
-
-        <!-- Main Password Manager -->
-        <div class="section-mobile hidden" id="mainSection">
-            <!-- Add New Password Button -->
-            <div style="text-align: center; margin-bottom: 20px;">
-                <button class="btn btn-success" onclick="toggleAddForm()" id="toggleAddBtn">➕ Add New Password</button>
-            </div>
-
-            <!-- Add New Password Form (Initially Hidden) -->
-            <div class="add-form hidden" id="addPasswordForm">
-                <h3>➕ Add New Password</h3>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="siteName">Site/Service</label>
-                        <input type="text" id="siteName" placeholder="Gmail, Facebook...">
-                    </div>
-                    <div class="form-group">
-                        <label for="siteUrl">URL (optional)</label>
-                        <input type="url" id="siteUrl" placeholder="https://...">
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="username">Username/Email</label>
-                        <input type="text" id="username" placeholder="your@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <div class="input-container">
-                            <input type="password" id="password" placeholder="Your password">
-                            <button class="password-toggle" onclick="togglePasswordVisibility('password')">👁️</button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="btn-row">
-                    <button class="btn btn-success" onclick="addPassword()" id="addBtn">💾 Save</button>
-                    <button class="btn btn-secondary" onclick="generatePassword()">🎲 Generate</button>
-                </div>
-            </div>
-
-            <!-- Search & Import -->
-            <div class="search-container">
-                <input type="text" class="search-input" id="searchInput" placeholder="Search passwords..." oninput="filterPasswords()">
-                <button class="clear-search hidden" id="clearSearch" onclick="clearSearch()">✕</button>
-            </div>
-            
-            <div class="btn-row" style="margin-bottom: 15px;">
-                <button class="btn btn-secondary" onclick="document.getElementById('csvImport').click()">📥 Import CSV</button>
-                <button class="btn btn-secondary" onclick="exportCSV()">📤 Export CSV</button>
-            </div>
-            
-            <input type="file" id="csvImport" accept=".csv" style="display: none;" onchange="handleCSVImport()">
-
-            <!-- Passwords List -->
-            <div id="passwordsList">
-                <div class="loading">Loading your passwords...</div>
-            </div>
-
-            <!-- Bottom Actions -->
-            <div style="margin-top: 20px;">
-                <div class="btn-row">
-                    <button class="btn btn-secondary" onclick="syncNow()" id="syncBtn">🔄 Sync</button>
-                    <button class="btn btn-danger" onclick="logout()">🔒 Lock</button>
-                </div>
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>🔐 Password Manager</h1>
+      <p>Secure • Synced • Simple</p>
+      <div class="sync-status sync-offline" id="syncStatus">⚫ Offline</div>
     </div>
 
-    <!-- Copy feedback -->
-    <div class="copy-feedback" id="copyFeedback">📋 Copied!</div>
+    <!-- GitHub Setup -->
+    <div class="section" id="setupSection">
+      <div class="warning">
+        <strong>⚠️ First Time Setup</strong><br>
+        Configure GitHub sync to access your passwords anywhere.
+      </div>
 
-    <script>
-        let masterKey = null;
-        let passwords = [];
-        let githubConfig = null;
-        let filteredPasswords = [];
-        let lastSyncTime = null;
-        let newPasswordsThisSession = new Set(); // Track new passwords added this session
+      <div class="steps">
+        <h4>Quick Setup:</h4>
+        <ol>
+          <li>Create a <strong>private</strong> GitHub repository</li>
+          <li>Generate a token with <strong>Contents Read and write</strong> permissions</li>
+          <li>Enter details below</li>
+        </ol>
+      </div>
 
-        // Load configuration on startup
-        window.addEventListener('load', () => {
-            const savedConfig = localStorage.getItem('githubConfig');
-            if (savedConfig) {
-                githubConfig = JSON.parse(savedConfig);
-                
-                // Clean any spaces
-                githubConfig.username = githubConfig.username.trim();
-                githubConfig.repo = githubConfig.repo.trim();
-                githubConfig.token = githubConfig.token.trim();
-                
-                localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-                console.log('Loaded GitHub config:', githubConfig);
-                
-                document.getElementById('setupSection').style.display = 'none';
-                document.getElementById('authSection').classList.remove('hidden');
-            }
+      <div class="form-group-compact">
+        <label for="githubUsername">GitHub Username</label>
+        <input type="text" id="githubUsername" placeholder="your-username">
+      </div>
+
+      <div class="form-group-compact">
+        <label for="repoName">Repository Name</label>
+        <input type="text" id="repoName" placeholder="my-passwords">
+      </div>
+
+      <div class="form-group-compact">
+        <label for="githubToken">Access Token</label>
+        <div class="input-container">
+          <input type="password" id="githubToken" placeholder="github_pat_...">
+          <button class="password-toggle" onclick="togglePasswordVisibility('githubToken')">👁️</button>
+        </div>
+      </div>
+
+      <button class="btn btn-success" onclick="saveGitHubConfig()">🚀 Save & Connect</button>
+      <button class="btn btn-secondary" onclick="testGitHubConnection()">🔍 Test Connection</button>
+
+      <div style="text-align:center;margin-top:15px">
+        <small style="color:#7f8c8d">
+          Need help? <a href="#" onclick="skipGitHubCheck()" style="color:#3498db">Skip verification</a>
+        </small>
+      </div>
+    </div>
+
+    <!-- Create Master Password -->
+    <div class="section hidden" id="createPasswordSection">
+      <div class="info">
+        <strong>🔐 Create Master Password</strong><br>
+        This encrypts all your passwords. Make it strong and memorable.
+      </div>
+
+      <div class="form-group-compact">
+        <label for="newMasterPassword">Master Password</label>
+        <div class="input-container">
+          <input type="password" id="newMasterPassword" placeholder="Create a strong password" onkeypress="if(event.key==='Enter') createMasterPassword()" oninput="checkPasswordStrength(this.value)">
+          <button class="password-toggle" onclick="togglePasswordVisibility('newMasterPassword')">👁️</button>
+        </div>
+        <div class="password-strength" id="strengthIndicator"></div>
+      </div>
+
+      <div class="form-group-compact">
+        <label for="confirmMasterPassword">Confirm Password</label>
+        <div class="input-container">
+          <input type="password" id="confirmMasterPassword" placeholder="Confirm your password" onkeypress="if(event.key==='Enter') createMasterPassword()">
+          <button class="password-toggle" onclick="togglePasswordVisibility('confirmMasterPassword')">👁️</button>
+        </div>
+      </div>
+
+      <button class="btn btn-success" id="createBtn" onclick="createMasterPassword()">🔑 Create Vault</button>
+      <button class="btn btn-secondary" onclick="switchToLogin()">Already Have a Vault</button>
+    </div>
+
+    <!-- Login -->
+    <div class="section hidden" id="authSection">
+      <div class="info">
+        <strong>🔐 Welcome Back</strong><br>
+        Enter your master password to unlock your vault.
+      </div>
+
+      <div class="form-group-compact">
+        <label for="masterPassword">Master Password</label>
+        <div class="input-container">
+          <input type="password" id="masterPassword" placeholder="Enter your master password" onkeypress="if(event.key==='Enter') authenticate()">
+          <button class="password-toggle" onclick="togglePasswordVisibility('masterPassword')">👁️</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="unlockBtn" onclick="authenticate()">🔓 Unlock Vault</button>
+      <button class="btn btn-secondary" onclick="switchToCreate()">Create New Vault</button>
+    </div>
+
+    <!-- Main -->
+    <div class="section-mobile hidden" id="mainSection">
+      <div style="text-align:center;margin-bottom:20px">
+        <button class="btn btn-success" id="toggleAddBtn" onclick="toggleAddForm()">➕ Add New Password</button>
+      </div>
+
+      <div class="add-form hidden" id="addPasswordForm">
+        <h3>➕ Add New Password</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="siteName">Site or Service</label>
+            <input type="text" id="siteName" placeholder="Gmail, Facebook...">
+          </div>
+          <div class="form-group">
+            <label for="siteUrl">URL optional</label>
+            <input type="url" id="siteUrl" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="username">Username or Email</label>
+            <input type="text" id="username" placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <div class="input-container">
+              <input type="password" id="password" placeholder="Your password">
+              <button class="password-toggle" onclick="togglePasswordVisibility('password')">👁️</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-success" id="addBtn" onclick="addPassword()">💾 Save</button>
+          <button class="btn btn-secondary" onclick="generatePassword()">🎲 Generate</button>
+        </div>
+      </div>
+
+      <div class="search-container">
+        <input type="text" class="search-input" id="searchInput" placeholder="Search passwords..." oninput="filterPasswords()">
+        <button class="clear-search hidden" id="clearSearch" onclick="clearSearch()">✕</button>
+      </div>
+
+      <div class="btn-row" style="margin-bottom:15px">
+        <button class="btn btn-secondary" onclick="document.getElementById('csvImport').click()">📥 Import CSV</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">📤 Export CSV</button>
+      </div>
+      <input type="file" id="csvImport" accept=".csv" style="display:none" onchange="handleCSVImport()">
+
+      <div id="passwordsList">
+        <div class="loading">Loading your passwords...</div>
+      </div>
+
+      <div style="margin-top:20px">
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="syncBtn" onclick="syncNow()">🔄 Sync</button>
+          <button class="btn btn-danger" onclick="logout()">🔒 Lock</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="copy-feedback" id="copyFeedback">📋 Copied!</div>
+
+  <script>
+    let masterKey = null;
+    let passwords = [];
+    let githubConfig = null;
+    let filteredPasswords = [];
+    let lastSyncTime = null;
+    let newPasswordsThisSession = new Set();
+
+    // startup
+    window.addEventListener('load', () => {
+      const saved = localStorage.getItem('githubConfig');
+      if (saved) {
+        githubConfig = JSON.parse(saved);
+        githubConfig.username = githubConfig.username.trim();
+        githubConfig.repo = githubConfig.repo.trim();
+        githubConfig.token = githubConfig.token.trim();
+        localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+        document.getElementById('setupSection').style.display = 'none';
+        document.getElementById('authSection').classList.remove('hidden');
+      }
+    });
+
+    // ui helpers
+    function togglePasswordVisibility(id){
+      const input = document.getElementById(id);
+      const btn = input.nextElementSibling;
+      if(input.type==='password'){ input.type='text'; btn.textContent='🙈'; }
+      else { input.type='password'; btn.textContent='👁️'; }
+    }
+
+    function checkPasswordStrength(pwd){
+      const el = document.getElementById('strengthIndicator');
+      if(!el) return;
+      let score = 0;
+      if(pwd.length>=8) score++;
+      if(pwd.length>=12) score++;
+      if(/[A-Z]/.test(pwd)) score++;
+      if(/[a-z]/.test(pwd)) score++;
+      if(/[0-9]/.test(pwd)) score++;
+      if(/[^A-Za-z0-9]/.test(pwd)) score++;
+      el.style.width = Math.min(score*20,100)+'%';
+      if(score<3) el.className='password-strength strength-weak';
+      else if(score<5) el.className='password-strength strength-medium';
+      else el.className='password-strength strength-strong';
+    }
+
+    function updateSyncStatus(text, cls){
+      const el = document.getElementById('syncStatus');
+      el.textContent = text;
+      el.className = 'sync-status ' + cls;
+    }
+
+    function updateLastSyncTime(){
+      // intentionally empty no separate last sync label in ui
+    }
+
+    function switchToLogin(){
+      document.getElementById('createPasswordSection').style.display='none';
+      document.getElementById('authSection').classList.remove('hidden');
+      updateSyncStatus('🔐 Ready to unlock','sync-offline');
+    }
+
+    function switchToCreate(){
+      document.getElementById('authSection').style.display='none';
+      document.getElementById('createPasswordSection').classList.remove('hidden');
+      updateSyncStatus('🆕 Ready to create','sync-offline');
+    }
+
+    function toggleAddForm(){
+      const form = document.getElementById('addPasswordForm');
+      const btn = document.getElementById('toggleAddBtn');
+      if(form.classList.contains('hidden')){
+        form.classList.remove('hidden');
+        btn.textContent='➖ Hide Add Form';
+      }else{
+        form.classList.add('hidden');
+        btn.textContent='➕ Add New Password';
+        document.getElementById('siteName').value='';
+        document.getElementById('siteUrl').value='';
+        document.getElementById('username').value='';
+        document.getElementById('password').value='';
+      }
+    }
+
+    // crypto
+    async function deriveKey(password, salt){
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+      return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:100000, hash:'SHA-256'}, keyMaterial, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+    }
+
+    async function encrypt(text, key){
+      const enc = new TextEncoder();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(text));
+      return { iv: Array.from(iv), data: Array.from(new Uint8Array(ct)) };
+    }
+
+    async function decrypt(payload, key){
+      const iv = new Uint8Array(payload.iv);
+      const data = new Uint8Array(payload.data);
+      const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data);
+      return new TextDecoder().decode(pt);
+    }
+
+    // github api
+    async function githubApiCall(endpoint, method='GET', data=null){
+      const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/${endpoint}`;
+      const options = {
+        method,
+        headers:{
+          'Authorization': `token ${githubConfig.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        }
+      };
+      if(data) options.body = JSON.stringify(data);
+      const res = await fetch(url, options);
+      if(!res.ok){
+        const txt = await res.text();
+        throw new Error(`GitHub API error ${res.status} ${res.statusText} ${txt}`);
+      }
+      return res.json();
+    }
+
+    async function loadPasswordsFromGitHub(){
+      try{
+        updateSyncStatus('🔄 Syncing...','sync-offline');
+        const file = await githubApiCall('contents/passwords.json');
+        const raw = atob(file.content);
+        const encrypted = JSON.parse(raw);
+        const json = await decrypt(encrypted, masterKey);
+        passwords = JSON.parse(json);
+        lastSyncTime = new Date();
+        updateSyncStatus('🟢 Synced','sync-online');
+        updateLastSyncTime();
+      }catch(err){
+        if(String(err.message).includes('404')){
+          passwords = [];
+          await savePasswordsToGitHub();
+        }else{
+          console.error('Failed to load', err);
+          updateSyncStatus('🔴 Sync Error','sync-offline');
+          throw err;
+        }
+      }
+    }
+
+    async function savePasswordsToGitHub(){
+      try{
+        updateSyncStatus('🔄 Saving...','sync-offline');
+        const plaintext = JSON.stringify(passwords);
+        const encrypted = await encrypt(plaintext, masterKey);
+        const content = btoa(JSON.stringify(encrypted));
+
+        let sha = null;
+        try{
+          const existing = await githubApiCall('contents/passwords.json');
+          sha = existing.sha;
+        }catch(_){}
+
+        const commit = {
+          message: `Update passwords ${new Date().toISOString()}`,
+          content
+        };
+        if(sha) commit.sha = sha;
+
+        await githubApiCall('contents/passwords.json', 'PUT', commit);
+        lastSyncTime = new Date();
+        updateSyncStatus('🟢 Synced','sync-online');
+        updateLastSyncTime();
+      }catch(err){
+        console.error('Save failed', err);
+        updateSyncStatus('🔴 Sync Error','sync-offline');
+
+        if(String(err.message).includes('409') || String(err.message).includes('does not match')){
+          try{
+            const fresh = await githubApiCall('contents/passwords.json');
+            const retryCommit = {
+              message: `Update passwords ${new Date().toISOString()} retry`,
+              content: btoa(JSON.stringify(await encrypt(JSON.stringify(passwords), masterKey))),
+              sha: fresh.sha
+            };
+            await githubApiCall('contents/passwords.json','PUT',retryCommit);
+            lastSyncTime = new Date();
+            updateSyncStatus('🟢 Synced','sync-online');
+            updateLastSyncTime();
+            return;
+          }catch(retryErr){
+            console.error('Retry failed', retryErr);
+            updateSyncStatus('🔴 Sync Error','sync-offline');
+          }
+        }
+        throw err;
+      }
+    }
+
+    // setup actions
+    async function testGitHubConnection(){
+      const username = document.getElementById('githubUsername').value.trim();
+      const repo = document.getElementById('repoName').value.trim();
+      const token = document.getElementById('githubToken').value.trim();
+      if(!username || !repo || !token){ alert('Please fill in all fields first'); return; }
+
+      const original = githubConfig;
+      githubConfig = {username, repo, token};
+
+      try{
+        updateSyncStatus('🔄 Testing...','sync-offline');
+
+        const repoInfo = await fetch(`https://api.github.com/repos/${username}/${repo}`,{
+          headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json'}
+        });
+        if(!repoInfo.ok) throw new Error(`Repository access failed ${repoInfo.status}`);
+
+        const write = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.test-file`,{
+          method:'PUT',
+          headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+          body:JSON.stringify({message:'Test file', content:btoa('test')})
+        });
+        if(!write.ok) throw new Error('Cannot write to repository. Check token permissions.');
+
+        const info = await write.json();
+        await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.test-file`,{
+          method:'DELETE',
+          headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+          body:JSON.stringify({message:'Clean up test file', sha:info.content.sha})
         });
 
-        // Password visibility toggle
-        function togglePasswordVisibility(inputId) {
-            const input = document.getElementById(inputId);
-            const toggle = input.nextElementSibling;
-            
-            if (input.type === 'password') {
-                input.type = 'text';
-                toggle.textContent = '🙈';
-            } else {
-                input.type = 'password';
-                toggle.textContent = '👁️';
-            }
+        updateSyncStatus('✅ Connected','sync-online');
+        alert('Connection successful. You can now save configuration.');
+        localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+        document.getElementById('setupSection').style.display='none';
+        document.getElementById('createPasswordSection').classList.remove('hidden');
+      }catch(err){
+        console.error('Connection test failed', err);
+        alert(`Connection failed ${err.message}`);
+        updateSyncStatus('❌ Failed','sync-offline');
+      }finally{
+        if(!githubConfig) githubConfig = original;
+      }
+    }
+
+    async function saveGitHubConfig(){
+      const username = document.getElementById('githubUsername').value.trim();
+      const repo = document.getElementById('repoName').value.trim();
+      const token = document.getElementById('githubToken').value.trim();
+      if(!username || !repo || !token){ alert('Please fill in all fields'); return; }
+      if(username.includes(' ') || repo.includes(' ')){ alert('Username and repository cannot contain spaces'); return; }
+
+      githubConfig = {username, repo, token};
+      localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+
+      document.getElementById('setupSection').style.display='none';
+      updateSyncStatus('🔄 Checking vault...','sync-offline');
+
+      try{
+        await githubApiCall('contents/passwords.json');
+        document.getElementById('authSection').classList.remove('hidden');
+        updateSyncStatus('🔐 Vault found','sync-offline');
+      }catch(err){
+        if(String(err.message).includes('404')){
+          document.getElementById('createPasswordSection').classList.remove('hidden');
+          updateSyncStatus('🆕 New vault','sync-offline');
+        }else{
+          document.getElementById('createPasswordSection').classList.remove('hidden');
+          updateSyncStatus('❓ Choose option','sync-offline');
+        }
+      }
+    }
+
+    function skipGitHubCheck(){
+      const username = document.getElementById('githubUsername').value.trim();
+      const repo = document.getElementById('repoName').value.trim();
+      const token = document.getElementById('githubToken').value.trim();
+      if(!username || !repo || !token){ alert('Please fill in all GitHub fields first'); return; }
+      githubConfig = {username, repo, token};
+      localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+      document.getElementById('setupSection').style.display='none';
+      document.getElementById('createPasswordSection').classList.remove('hidden');
+      updateSyncStatus('🆕 Ready to create','sync-offline');
+    }
+
+    // auth actions
+    async function createMasterPassword(){
+      const pwd = document.getElementById('newMasterPassword').value;
+      const confirm = document.getElementById('confirmMasterPassword').value;
+      if(!pwd || !confirm){ alert('Please fill in both password fields'); return; }
+      if(pwd !== confirm){ alert('Passwords do not match'); return; }
+      if(pwd.length < 8){ alert('Master password must be at least 8 characters long'); return; }
+
+      const btn = document.getElementById('createBtn');
+      btn.disabled = true; btn.textContent = '🔄 Creating Vault...';
+      try{
+        const salt = new TextEncoder().encode('password-manager-salt-2024');
+        masterKey = await deriveKey(pwd, salt);
+        passwords = [];
+        newPasswordsThisSession.clear();
+        await savePasswordsToGitHub();
+
+        document.getElementById('createPasswordSection').style.display='none';
+        document.getElementById('mainSection').classList.remove('hidden');
+        document.getElementById('newMasterPassword').value='';
+        document.getElementById('confirmMasterPassword').value='';
+        displayPasswords();
+      }catch(err){
+        alert('Failed to create vault. Please try again.');
+        console.error(err);
+      }finally{
+        btn.disabled=false; btn.textContent='🔑 Create Vault';
+      }
+    }
+
+    async function authenticate(){
+      const pwd = document.getElementById('masterPassword').value;
+      if(!pwd){ alert('Please enter a master password'); return; }
+      const btn = document.getElementById('unlockBtn');
+      btn.disabled=true; btn.textContent='🔄 Unlocking...';
+      try{
+        const salt = new TextEncoder().encode('password-manager-salt-2024');
+        masterKey = await deriveKey(pwd, salt);
+        await loadPasswordsFromGitHub();
+        newPasswordsThisSession.clear();
+        document.getElementById('authSection').style.display='none';
+        document.getElementById('mainSection').classList.remove('hidden');
+        document.getElementById('masterPassword').value='';
+        displayPasswords();
+      }catch(err){
+        alert('Failed to unlock vault. Please check your master password.');
+        console.error(err);
+      }finally{
+        btn.disabled=false; btn.textContent='🔓 Unlock Vault';
+      }
+    }
+
+    // add edit list
+    async function addPassword(){
+      const siteName = document.getElementById('siteName').value.trim();
+      const siteUrl = document.getElementById('siteUrl').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const pwd = document.getElementById('password').value;
+      if(!siteName || !username || !pwd){ alert('Please fill in site name, username, and password'); return; }
+
+      const btn = document.getElementById('addBtn');
+      btn.disabled = true; btn.textContent='💾 Saving...';
+      try{
+        passwords.push({
+          siteName,
+          siteUrl,
+          username,
+          password: pwd,
+          dateAdded: new Date().toISOString()
+        });
+        const newIndex = passwords.length - 1;
+        newPasswordsThisSession.add(newIndex);
+
+        await savePasswordsToGitHub();
+        displayPasswords();
+
+        document.getElementById('siteName').value='';
+        document.getElementById('siteUrl').value='';
+        document.getElementById('username').value='';
+        document.getElementById('password').value='';
+        showCopyFeedback('✅ Password saved!');
+        document.getElementById('addPasswordForm').classList.add('hidden');
+        document.getElementById('toggleAddBtn').textContent='➕ Add New Password';
+      }catch(err){
+        alert('Failed to save password. Please try again.');
+        passwords.pop();
+      }finally{
+        btn.disabled=false; btn.textContent='💾 Save';
+      }
+    }
+
+    function displayPasswords(){
+      const container = document.getElementById('passwordsList');
+      let list = filteredPasswords.length>0 ? filteredPasswords : passwords;
+
+      if(list.length===0){
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🔑</div>
+            <strong>No passwords yet</strong><br>
+            <small>Add your first password above to get started</small>
+          </div>`;
+        return;
+      }
+
+      // sort new first then alphabetical
+      list = [...list].sort((a,b)=>{
+        const ia = passwords.indexOf(a);
+        const ib = passwords.indexOf(b);
+        const na = newPasswordsThisSession.has(ia);
+        const nb = newPasswordsThisSession.has(ib);
+        if(na && !nb) return -1;
+        if(!na && nb) return 1;
+        return a.siteName.toLowerCase().localeCompare(b.siteName.toLowerCase());
+      });
+
+      const grid = document.createElement('div');
+      grid.className='passwords-grid';
+
+      list.forEach(item=>{
+        const idx = passwords.indexOf(item);
+        const first = item.siteName.charAt(0).toUpperCase();
+        const isNew = newPasswordsThisSession.has(idx);
+        const div = document.createElement('div');
+        div.className = 'password-item' + (isNew ? ' new-password' : '');
+        div.innerHTML = `
+          <h3><span class="site-icon">${first}</span>${item.siteName}${isNew ? '<span style="color:#27ae60;font-size:.8rem;margin-left:5px">NEW</span>':''}</h3>
+          <p><strong>👤</strong> ${item.username}</p>
+          <div class="password-display hidden" id="pass-${idx}"><strong>🔑</strong> ${item.password}</div>
+          <div class="quick-actions">
+            <button class="btn btn-secondary" data-action="copy-username" data-value="${item.username}">📋 User</button>
+            <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
+            <button class="btn btn-secondary" data-action="toggle" data-index="${idx}">👁️ Show</button>
+            <button class="btn btn-danger" data-action="delete" data-index="${idx}">🗑️</button>
+          </div>
+        `;
+        div.querySelectorAll('button[data-action]').forEach(b=>b.addEventListener('click', handlePasswordAction));
+        grid.appendChild(div);
+      });
+
+      container.innerHTML='';
+      container.appendChild(grid);
+    }
+
+    function handlePasswordAction(e){
+      const action = e.target.dataset.action;
+      const idx = parseInt(e.target.dataset.index);
+      const val = e.target.dataset.value;
+      if(action==='toggle') togglePassword(idx, e.target);
+      else if(action==='copy-password') copyToClipboard(val,'password');
+      else if(action==='copy-username') copyToClipboard(val,'username');
+      else if(action==='delete') deletePasswordSafe(idx);
+    }
+
+    function togglePassword(index, button){
+      const el = document.getElementById(`pass-${index}`);
+      if(!el) return;
+      if(el.classList.contains('hidden')){ el.classList.remove('hidden'); button.textContent='🙈 Hide'; }
+      else { el.classList.add('hidden'); button.textContent='👁️ Show'; }
+    }
+
+    async function deletePasswordSafe(index){
+      if(!passwords[index]){ alert('Password not found'); return; }
+      const name = passwords[index].siteName;
+      if(!confirm(`Delete password for ${name}?`)) return;
+
+      let deleted;
+      try{
+        deleted = passwords.splice(index,1)[0];
+        newPasswordsThisSession.delete(index);
+        await savePasswordsToGitHub();
+        displayPasswords();
+        showCopyFeedback('🗑️ Password deleted');
+      }catch(err){
+        console.error('Delete failed', err);
+        alert('Failed to delete password. Please try again.');
+        if(deleted){ passwords.splice(index,0,deleted); displayPasswords(); }
+      }
+    }
+
+    async function copyToClipboard(text, type){
+      try{
+        await navigator.clipboard.writeText(text);
+        showCopyFeedback(type==='password' ? '🔑 Password copied!' : '👤 Username copied!');
+      }catch(_){
+        alert('Failed to copy to clipboard');
+      }
+    }
+
+    function showCopyFeedback(msg){
+      const el = document.getElementById('copyFeedback');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(()=>el.classList.remove('show'), 2000);
+    }
+
+    function generatePassword(){
+      const length = 16;
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+=[]{}|;:,.<>?';
+      let out = '';
+      for(let i=0;i<length;i++) out += chars.charAt(Math.floor(Math.random()*chars.length));
+      document.getElementById('password').value = out;
+      showCopyFeedback('🎲 Password generated!');
+    }
+
+    function filterPasswords(){
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const clearBtn = document.getElementById('clearSearch');
+      if(q){
+        clearBtn.classList.remove('hidden');
+        filteredPasswords = passwords.filter(p =>
+          p.siteName.toLowerCase().includes(q) ||
+          p.username.toLowerCase().includes(q) ||
+          (p.siteUrl && p.siteUrl.toLowerCase().includes(q))
+        );
+      }else{
+        clearBtn.classList.add('hidden');
+        filteredPasswords = [];
+      }
+      displayPasswords();
+    }
+
+    function clearSearch(){
+      document.getElementById('searchInput').value='';
+      document.getElementById('clearSearch').classList.add('hidden');
+      filteredPasswords = [];
+      displayPasswords();
+    }
+
+    async function syncNow(){
+      const btn = document.getElementById('syncBtn');
+      btn.disabled=true; btn.textContent='🔄 Syncing...';
+      try{
+        await loadPasswordsFromGitHub();
+        // sort for stable display
+        passwords.sort((a,b)=>a.siteName.toLowerCase().localeCompare(b.siteName.toLowerCase()));
+        newPasswordsThisSession.clear();
+        displayPasswords();
+        showCopyFeedback('🔄 Synced and sorted');
+      }catch(_){
+        alert('Sync failed. Please check your internet connection.');
+      }finally{
+        btn.disabled=false; btn.textContent='🔄 Sync';
+      }
+    }
+
+    function logout(){
+      if(!confirm('Lock your vault? You will need to enter your master password again.')) return;
+      masterKey = null;
+      passwords = [];
+      filteredPasswords = [];
+      lastSyncTime = null;
+      newPasswordsThisSession.clear();
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('mainSection').style.display='none';
+      updateSyncStatus('🔒 Locked','sync-offline');
+      document.getElementById('searchInput').value='';
+      document.getElementById('clearSearch').classList.add('hidden');
+    }
+
+    function resetConfig(){
+      if(!confirm('Reset GitHub configuration? You will need to set it up again.')) return;
+      localStorage.removeItem('githubConfig');
+      githubConfig = null;
+      location.reload();
+    }
+
+    // csv import export
+    async function handleCSVImport(){
+      const file = document.getElementById('csvImport').files[0];
+      if(!file) return;
+
+      try{
+        updateSyncStatus('🔄 Syncing before import','sync-offline');
+        await loadPasswordsFromGitHub();
+
+        const text = await file.text();
+        const imported = parseCSV(text);
+
+        if(imported.length===0){
+          alert('No valid rows found. Expected headers: name,website,username,secondary_username,password,notes');
+          return;
         }
 
-        // Password strength checker
-        function checkPasswordStrength(password) {
-            const indicator = document.getElementById('strengthIndicator');
-            if (!indicator) return;
-            
-            let score = 0;
-            if (password.length >= 8) score++;
-            if (password.length >= 12) score++;
-            if (/[A-Z]/.test(password)) score++;
-            if (/[a-z]/.test(password)) score++;
-            if (/[0-9]/.test(password)) score++;
-            if (/[^A-Za-z0-9]/.test(password)) score++;
-            
-            indicator.style.width = Math.min(score * 20, 100) + '%';
-            
-            if (score < 3) {
-                indicator.className = 'password-strength strength-weak';
-            } else if (score < 5) {
-                indicator.className = 'password-strength strength-medium';
-            } else {
-                indicator.className = 'password-strength strength-strong';
-            }
+        if(!confirm(`Import ${imported.length} passwords? They will be added to existing passwords.`)) return;
+
+        const startLen = passwords.length;
+        passwords.push(...imported);
+        for(let i=startLen;i<passwords.length;i++) newPasswordsThisSession.add(i);
+
+        await savePasswordsToGitHub();
+        displayPasswords();
+        showCopyFeedback('📥 CSV imported');
+      }catch(err){
+        console.error('Import failed', err);
+        alert('Import failed. Please check file format and try again.');
+      }
+    }
+
+    function exportCSV(){
+      if(passwords.length===0){ alert('No passwords to export'); return; }
+      const csv = [
+        'name,website,username,password,notes',
+        ...passwords.map(p=>{
+          const name = (p.siteName||'').replace(/,/g,'');
+          const website = (p.siteUrl||'').replace(/,/g,'');
+          const user = (p.username||'').replace(/,/g,'');
+          const pass = (p.password||'').replace(/,/g,'');
+          const notes = `Added ${new Date(p.dateAdded).toLocaleDateString()}`;
+          return `"${name}","${website}","${user}","${pass}","${notes}"`;
+        })
+      ].join('\n');
+
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `passwords-export-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showCopyFeedback('📤 CSV exported');
+    }
+
+    function parseCSV(text){
+      const lines = text.replace(/\r/g,'').trim().split('\n');
+      if(lines.length<2) return [];
+      // headers expected: name,website,username,secondary_username,password,notes
+      const out = [];
+      for(let i=1;i<lines.length;i++){
+        const cols = parseCSVLine(lines[i]);
+        if(cols.length<5) continue;
+        const siteName = (cols[0]||'').trim();
+        const website = (cols[1]||'').trim();
+        const username = (cols[2]||'').trim();
+        const password = (cols[4]||'').trim();
+        if(!siteName || !username || !password) continue;
+        const entry = {
+          siteName,
+          username,
+          password,
+          dateAdded: new Date().toISOString()
+        };
+        if(website){
+          let url = website;
+          if(url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+          entry.siteUrl = url;
         }
-
-        // Encryption functions
-        async function deriveKey(password, salt) {
-            const encoder = new TextEncoder();
-            const keyMaterial = await window.crypto.subtle.importKey(
-                'raw',
-                encoder.encode(password),
-                'PBKDF2',
-                false,
-                ['deriveKey']
-            );
-
-            return window.crypto.subtle.deriveKey(
-                {
-                    name: 'PBKDF2',
-                    salt: salt,
-                    iterations: 100000,
-                    hash: 'SHA-256'
-                },
-                keyMaterial,
-                { name: 'AES-GCM', length: 256 },
-                false,
-                ['encrypt', 'decrypt']
-            );
-        }
-
-        async function encrypt(text, key) {
-            const encoder = new TextEncoder();
-            const iv = window.crypto.getRandomValues(new Uint8Array(12));
-            
-            const encrypted = await window.crypto.subtle.encrypt(
-                { name: 'AES-GCM', iv: iv },
-                key,
-                encoder.encode(text)
-            );
-
-            return {
-                iv: Array.from(iv),
-                data: Array.from(new Uint8Array(encrypted))
-            };
-        }
-
-        async function decrypt(encryptedData, key) {
-            const iv = new Uint8Array(encryptedData.iv);
-            const data = new Uint8Array(encryptedData.data);
-
-            const decrypted = await window.crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv },
-                key,
-                data
-            );
-
-            return new TextDecoder().decode(decrypted);
-        }
-
-        // GitHub API functions
-        async function githubApiCall(endpoint, method = 'GET', data = null) {
-            const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/${endpoint}`;
-            
-            const options = {
-                method,
-                headers: {
-                    'Authorization': `token ${githubConfig.token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                }
-            };
-
-            if (data) {
-                options.body = JSON.stringify(data);
-            }
-
-            const response = await fetch(url, options);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            return response.json();
-        }
-
-        async function loadPasswordsFromGitHub() {
-            try {
-                updateSyncStatus('🔄 Syncing...', 'sync-offline');
-                
-                const fileData = await githubApiCall('contents/passwords.json');
-                const encryptedContent = atob(fileData.content);
-                const encryptedData = JSON.parse(encryptedContent);
-                
-                const decryptedData = await decrypt(encryptedData, masterKey);
-                passwords = JSON.parse(decryptedData);
-                lastSyncTime = new Date();
-                
-                updateSyncStatus('🟢 Synced', 'sync-online');
-            } catch (error) {
-                if (error.message.includes('404')) {
-                    passwords = [];
-                    try {
-                        await savePasswordsToGitHub();
-                    } catch (saveError) {
-                        console.error('Failed to create initial file:', saveError);
-                        updateSyncStatus('🔴 Sync Error', 'sync-offline');
-                    }
-                } else {
-                    console.error('Failed to load from GitHub:', error);
-                    updateSyncStatus('🔴 Sync Error', 'sync-offline');
-                    throw error;
-                }
-            }
-        }
-
-        async function savePasswordsToGitHub() {
-            try {
-                updateSyncStatus('🔄 Saving...', 'sync-offline');
-                
-                const dataToEncrypt = JSON.stringify(passwords);
-                const encrypted = await encrypt(dataToEncrypt, masterKey);
-                const encryptedContent = JSON.stringify(encrypted);
-                
-                // Always fetch the latest SHA to avoid conflicts
-                let sha = null;
-                try {
-                    const existingFile = await githubApiCall('contents/passwords.json');
-                    sha = existingFile.sha;
-                } catch (e) {
-                    // File doesn't exist, that's ok
-                }
-                
-                const commitData = {
-                    message: `Update passwords - ${new Date().toISOString()}`,
-                    content: btoa(encryptedContent)
-                };
-                
-                if (sha) {
-                    commitData.sha = sha;
-                }
-                
-                await githubApiCall('contents/passwords.json', 'PUT', commitData);
-                lastSyncTime = new Date();
-                updateSyncStatus('🟢 Synced', 'sync-online');
-                
-            } catch (error) {
-                console.error('Failed to save to GitHub:', error);
-                updateSyncStatus('🔴 Sync Error', 'sync-offline');
-                
-                // If it's a SHA conflict, try once more with fresh SHA
-                if (error.message.includes('409') || error.message.includes('does not match')) {
-                    console.log('SHA conflict detected, retrying with fresh SHA...');
-                    try {
-                        const freshFile = await githubApiCall('contents/passwords.json');
-                        const commitData = {
-                            message: `Update passwords - ${new Date().toISOString()} (retry)`,
-                            content: btoa(JSON.stringify(await encrypt(JSON.stringify(passwords), masterKey))),
-                            sha: freshFile.sha
-                        };
-                        
-                        await githubApiCall('contents/passwords.json', 'PUT', commitData);
-                        lastSyncTime = new Date();
-                        updateSyncStatus('🟢 Synced', 'sync-online');
-                        return; // Success on retry
-                    } catch (retryError) {
-                        console.error('Retry also failed:', retryError);
-                        updateSyncStatus('🔴 Sync Error', 'sync-offline');
-                    }
-                }
-                
-                throw error;
-            }
-        }
-
-        function updateSyncStatus(text, className) {
-            const statusElement = document.getElementById('syncStatus');
-            statusElement.textContent = text;
-            statusElement.className = `sync-status ${className}`;
-        }
-
-        // GitHub connection test
-        async function testGitHubConnection() {
-            const username = document.getElementById('githubUsername').value.trim();
-            const repo = document.getElementById('repoName').value.trim();
-            const token = document.getElementById('githubToken').value.trim();
-
-            if (!username || !repo || !token) {
-                alert('Please fill in all fields first');
-                return;
-            }
-
-            const testConfig = { username, repo, token };
-            const originalConfig = githubConfig;
-            githubConfig = testConfig;
-
-            try {
-                updateSyncStatus('🔄 Testing...', 'sync-offline');
-                
-                const repoInfo = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-
-                if (!repoInfo.ok) {
-                    throw new Error(`Repository access failed: ${repoInfo.status}`);
-                }
-
-                const testFileContent = btoa('test');
-                const writeTestResponse = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.test-file`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: 'Test file',
-                        content: testFileContent
-                    })
-                });
-
-                if (!writeTestResponse.ok) {
-                    throw new Error('Cannot write to repository. Check token permissions.');
-                }
-
-                // Cleanup
-                const testFileInfo = await writeTestResponse.json();
-                await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.test-file`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: 'Clean up test file',
-                        sha: testFileInfo.content.sha
-                    })
-                });
-
-                updateSyncStatus('✅ Connected', 'sync-online');
-                alert('✅ Connection successful! You can now save your configuration.');
-                
-                // Auto-save and proceed
-                githubConfig = testConfig;
-                localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-                document.getElementById('setupSection').style.display = 'none';
-                document.getElementById('createPasswordSection').classList.remove('hidden');
-
-            } catch (error) {
-                console.error('Connection test failed:', error);
-                alert(`❌ Connection failed: ${error.message}`);
-                updateSyncStatus('❌ Failed', 'sync-offline');
-            } finally {
-                if (!githubConfig || githubConfig === originalConfig) {
-                    githubConfig = originalConfig;
-                }
-            }
-        }
-
-        // Save GitHub configuration
-        async function saveGitHubConfig() {
-            const username = document.getElementById('githubUsername').value.trim();
-            const repo = document.getElementById('repoName').value.trim();
-            const token = document.getElementById('githubToken').value.trim();
-
-            if (!username || !repo || !token) {
-                alert('Please fill in all fields');
-                return;
-            }
-
-            if (username.includes(' ') || repo.includes(' ')) {
-                alert('GitHub username and repository name cannot contain spaces');
-                return;
-            }
-
-            githubConfig = { username, repo, token };
-            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-
-            document.getElementById('setupSection').style.display = 'none';
-            updateSyncStatus('🔄 Checking vault...', 'sync-offline');
-            
-            try {
-                const vaultCheck = await githubApiCall('contents/passwords.json');
-                document.getElementById('authSection').classList.remove('hidden');
-                updateSyncStatus('🔐 Vault found', 'sync-offline');
-            } catch (error) {
-                if (error.message.includes('404')) {
-                    document.getElementById('createPasswordSection').classList.remove('hidden');
-                    updateSyncStatus('🆕 New vault', 'sync-offline');
-                } else {
-                    document.getElementById('createPasswordSection').classList.remove('hidden');
-                    updateSyncStatus('❓ Choose option', 'sync-offline');
-                }
-            }
-        }
-
-        function skipGitHubCheck() {
-            const username = document.getElementById('githubUsername').value.trim();
-            const repo = document.getElementById('repoName').value.trim();
-            const token = document.getElementById('githubToken').value.trim();
-
-            if (!username || !repo || !token) {
-                alert('Please fill in all GitHub fields first');
-                return;
-            }
-
-            githubConfig = { username, repo, token };
-            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-
-            document.getElementById('setupSection').style.display = 'none';
-            document.getElementById('createPasswordSection').classList.remove('hidden');
-            updateSyncStatus('🆕 Ready to create', 'sync-offline');
-        }
-
-        function switchToLogin() {
-            document.getElementById('createPasswordSection').style.display = 'none';
-            document.getElementById('authSection').classList.remove('hidden');
-            updateSyncStatus('🔐 Ready to unlock', 'sync-offline');
-        }
-
-        function switchToCreate() {
-            document.getElementById('authSection').style.display = 'none';
-            document.getElementById('createPasswordSection').classList.remove('hidden');
-            updateSyncStatus('🆕 Ready to create', 'sync-offline');
-        }
-
-        async function createMasterPassword() {
-            const newPassword = document.getElementById('newMasterPassword').value;
-            const confirmPassword = document.getElementById('confirmMasterPassword').value;
-
-            if (!newPassword || !confirmPassword) {
-                alert('Please fill in both password fields');
-                return;
-            }
-
-            if (newPassword !== confirmPassword) {
-                alert('Passwords do not match');
-                return;
-            }
-
-            if (newPassword.length < 8) {
-                alert('Master password must be at least 8 characters long');
-                return;
-            }
-
-            const createBtn = document.getElementById('createBtn');
-            createBtn.disabled = true;
-            createBtn.innerHTML = '🔄 Creating Vault...';
-
-            try {
-                const salt = new TextEncoder().encode('password-manager-salt-2024');
-                masterKey = await deriveKey(newPassword, salt);
-                
-                passwords = [];
-                newPasswordsThisSession.clear();
-                await savePasswordsToGitHub();
-                
-                document.getElementById('createPasswordSection').style.display = 'none';
-                document.getElementById('mainSection').classList.remove('hidden');
-                
-                document.getElementById('newMasterPassword').value = '';
-                document.getElementById('confirmMasterPassword').value = '';
-                
-                displayPasswords();
-            } catch (error) {
-                alert('Failed to create vault. Please try again.');
-                console.error(error);
-            } finally {
-                createBtn.disabled = false;
-                createBtn.innerHTML = '🔑 Create Vault';
-            }
-        }
-
-        async function authenticate() {
-            const masterPassword = document.getElementById('masterPassword').value;
-            if (!masterPassword) {
-                alert('Please enter a master password');
-                return;
-            }
-
-            const unlockBtn = document.getElementById('unlockBtn');
-            unlockBtn.disabled = true;
-            unlockBtn.innerHTML = '🔄 Unlocking...';
-
-            try {
-                const salt = new TextEncoder().encode('password-manager-salt-2024');
-                masterKey = await deriveKey(masterPassword, salt);
-                
-                await loadPasswordsFromGitHub();
-                
-                // Clear new password tracking when loading existing data
-                newPasswordsThisSession.clear();
-                
-                document.getElementById('authSection').style.display = 'none';
-                document.getElementById('mainSection').classList.remove('hidden');
-                document.getElementById('masterPassword').value = '';
-                
-                displayPasswords();
-            } catch (error) {
-                alert('Failed to unlock vault. Please check your master password.');
-                console.error(error);
-            } finally {
-                unlockBtn.disabled = false;
-                unlockBtn.innerHTML = '🔓 Unlock Vault';
-            }
-        }
-
-        // Toggle add form visibility
-        function toggleAddForm() {
-            const form = document.getElementById('addPasswordForm');
-            const btn = document.getElementById('toggleAddBtn');
-            
-            if (form.classList.contains('hidden')) {
-                form.classList.remove('hidden');
-                btn.textContent = '➖ Hide Add Form';
-            } else {
-                form.classList.add('hidden');
-                btn.textContent = '➕ Add New Password';
-                
-                // Clear form when hiding
-                document.getElementById('siteName').value = '';
-                document.getElementById('siteUrl').value = '';
-                document.getElementById('username').value = '';
-                document.getElementById('password').value = '';
-            }
-        }
-
-        async function addPassword() {
-            const siteName = document.getElementById('siteName').value.trim();
-            const siteUrl = document.getElementById('siteUrl').value.trim();
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-
-            if (!siteName || !username || !password) {
-                alert('Please fill in site name, username, and password');
-                return;
-            }
-
-            const addBtn = document.getElementById('addBtn');
-            addBtn.disabled = true;
-            addBtn.innerHTML = '💾 Saving...';
-
-            try {
-                const newPasswordIndex = passwords.length;
-                passwords.push({
-                    siteName,
-                    siteUrl,
-                    username,
-                    password,
-                    dateAdded: new Date().toISOString()
-                });
-
-                // Track this as a new password
-                newPasswordsThisSession.add(newPasswordIndex);
-
-                await savePasswordsToGitHub();
-                displayPasswords();
-
-                // Clear form
-                document.getElementById('siteName').value = '';
-                document.getElementById('siteUrl').value = '';
-                document.getElementById('username').value = '';
-                document.getElementById('password').value = '';
-
-                showCopyFeedback('✅ Password saved!');
-                
-                // Hide the add form after saving
-                document.getElementById('addPasswordForm').classList.add('hidden');
-                document.getElementById('toggleAddBtn').textContent = '➕ Add New Password';
-            } catch (error) {
-                alert('Failed to save password. Please try again.');
-                passwords.pop();
-                newPasswordsThisSession.delete(passwords.length);
-            } finally {
-                addBtn.disabled = false;
-                addBtn.innerHTML = '💾 Save';
-            }
-        }
-
-        function generatePassword() {
-            const length = 16;
-            const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-            let password = '';
-            
-            for (let i = 0; i < length; i++) {
-                password += charset.charAt(Math.floor(Math.random() * charset.length));
-            }
-            
-            document.getElementById('password').value = password;
-            showCopyFeedback('🎲 Password generated!');
-        }
-
-        // CSV Import/Export Functions
-        async function handleCSVImport() {
-            const file = document.getElementById('csvImport').files[0];
-            if (!file) return;
-
-            try {
-                console.log('Starting CSV import...');
-                
-                // First sync to get latest data and avoid conflicts
-                console.log('Syncing before import...');
-                await loadPasswordsFromGitHub();
-                
-                const text = await file.text();
-                console.log('File content loaded, parsing...');
-                
-                const importedPasswords = parseCSV(text);
-                
-                if (importedPasswords.length === 0) {
-                    alert('No valid passwords found in CSV file.\n\nExpected format:\nname,website,username,secondary_username,password,notes');
-                    return;
-                }
-
-                const confirmMessage = `Import ${importedPasswords.length} passwords?\n\nThis will add them to your existing passwords.`;
-                
-                if (!confirm(confirmMessage)) return;
-
-                console.log('User confirmed import, adding passwords...');
-                
-                // Add imported passwords to existing ones
-                const originalLength = passwords.length;
-                passwords.push(...importedPasswords);
-                
-                // Track imported passwords as new
-                for (let i = originalLength; i < passwords.length; i++) {
-                    newPasswordsThisSession.add(i);
-                }
-                
-                console.log('Saving to GitHub...');
-                await savePasswordsToGitHub();
-                
-                console.log('Refreshing display...');
-                displayPasswords();
-                
-                showCopyFeedback(`✅ Imported ${importedPasswords.length} passwords!`);
-                
-            } catch (error) {
-                console.error('CSV import failed:', error);
-                alert(`Failed to import CSV: ${error.message}`);
-            }
-        }
-
-        function parseCSV(csvText) {
-            const lines = csvText.trim().split('\n');
-            if (lines.length < 2) {
-                throw new Error('CSV file must have at least a header and one data row');
-            }
-            
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-            console.log('CSV Headers found:', headers);
-            
-            // Your format: name,website,username,secondary_username,password,notes
-            // Map to expected positions
-            const nameIndex = 0;      // name
-            const websiteIndex = 1;   // website  
-            const usernameIndex = 2;  // username
-            const passwordIndex = 4;  // password (skip secondary_username at index 3)
-            const notesIndex = 5;     // notes (optional)
-            
-            const passwords = [];
-            
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                
-                const columns = parseCSVLine(line);
-                console.log(`Processing row ${i}:`, columns);
-                
-                if (columns.length < 5) {
-                    console.warn(`Skipping row ${i}: not enough columns (need at least 5, got ${columns.length})`);
-                    continue;
-                }
-                
-                const siteName = columns[nameIndex]?.trim();
-                const website = columns[websiteIndex]?.trim();
-                const username = columns[usernameIndex]?.trim();
-                const password = columns[passwordIndex]?.trim();
-                
-                if (!siteName || !username || !password) {
-                    console.warn(`Skipping row ${i}: missing required fields`, { siteName, username, password: password ? '[present]' : '[missing]' });
-                    continue;
-                }
-                
-                const passwordEntry = {
-                    siteName,
-                    username,
-                    password,
-                    dateAdded: new Date().toISOString()
-                };
-                
-                // Add website URL if available
-                if (website) {
-                    let url = website;
-                    if (url && !url.startsWith('http')) {
-                        url = 'https://' + url;
-                    }
-                    passwordEntry.siteUrl = url;
-                }
-                
-                passwords.push(passwordEntry);
-                console.log(`Added password for: ${siteName}`);
-            }
-            
-            console.log(`Successfully parsed ${passwords.length} passwords from CSV`);
-            return passwords;
-        }
-
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current.trim());
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            result.push(current.trim());
-            return result;
-        }
-
-        function exportCSV() {
-            if (passwords.length === 0) {
-                alert('No passwords to export');
-                return;
-            }
-
-            const csvContent = [
-                'name,website,username,password,notes',
-                ...passwords.map(p => {
-                    const name = (p.siteName || '').replace(/,/g, '');
-                    const website = (p.siteUrl || '').replace(/,/g, '');
-                    const username = (p.username || '').replace(/,/g, '');
-                    const password = (p.password || '').replace(/,/g, '');
-                    const notes = `Added: ${new Date(p.dateAdded).toLocaleDateString()}`;
-                    
-                    return `"${name}","${website}","${username}","${password}","${notes}"`;
-                })
-            ].join('\n');
-
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `passwords-export-${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            showCopyFeedback('📤 CSV exported!');
-        }
-
-        function filterPasswords() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const clearBtn = document.getElementById('clearSearch');
-            
-            if (query) {
-                clearBtn.classList.remove('hidden');
-                filteredPasswords = passwords.filter(p => 
-                    p.siteName.toLowerCase().includes(query) ||
-                    p.username.toLowerCase().includes(query) ||
-                    (p.siteUrl && p.siteUrl.toLowerCase().includes(query))
-                );
-            } else {
-                clearBtn.classList.add('hidden');
-                filteredPasswords = [];
-            }
-            
-            displayPasswords();
-        }
-
-        function clearSearch() {
-            document.getElementById('searchInput').value = '';
-            document.getElementById('clearSearch').classList.add('hidden');
-            filteredPasswords = [];
-            displayPasswords();
-        }
-
-        async function syncNow() {
-            const syncBtn = document.getElementById('syncBtn');
-            syncBtn.disabled = true;
-            syncBtn.innerHTML = '🔄 Syncing...';
-
-            try {
-                await loadPasswordsFromGitHub();
-                
-                // Sort passwords alphabetically by site name after sync
-                passwords.sort((a, b) => a.siteName.toLowerCase().localeCompare(b.siteName.toLowerCase()));
-                
-                // Clear new password tracking after sync
-                newPasswordsThisSession.clear();
-                
-                displayPasswords();
-                showCopyFeedback('🔄 Synced & sorted alphabetically!');
-            } catch (error) {
-                alert('Sync failed. Please check your internet connection.');
-            } finally {
-                syncBtn.disabled = false;
-                syncBtn.innerHTML = '🔄 Sync';
-            }
-        }
-
-        function logout() {
-            if (confirm('Lock your vault? You\'ll need to enter your master password again.')) {
-                masterKey = null;
-                passwords = [];
-                filteredPasswords = [];
-                lastSyncTime = null;
-                newPasswordsThisSession.clear();
-                
-                document.getElementById('authSection').classList.remove('hidden');
-                document.getElementById('mainSection').style.display = 'none';
-                updateSyncStatus('🔒 Locked', 'sync-offline');
-                
-                // Clear search
-                document.getElementById('searchInput').value = '';
-                document.getElementById('clearSearch').classList.add('hidden');
-            }
-        }
-
-        function displayPasswords() {
-            const container = document.getElementById('passwordsList');
-            let toShow = filteredPasswords.length > 0 ? filteredPasswords : passwords;
-
-            if (toShow.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🔑</div>
-                        <strong>No passwords yet</strong><br>
-                        <small>Add your first password above to get started!</small>
-                    </div>
-                `;
-                return;
-            }
-
-            // Sort passwords: new ones first, then alphabetically
-            toShow = [...toShow].sort((a, b) => {
-                const aIndex = passwords.indexOf(a);
-                const bIndex = passwords.indexOf(b);
-                const aIsNew = newPasswordsThisSession.has(aIndex);
-                const bIsNew = newPasswordsThisSession.has(bIndex);
-                
-                // New passwords go to top
-                if (aIsNew && !bIsNew) return -1;
-                if (!aIsNew && bIsNew) return 1;
-                
-                // Within same category (both new or both old), sort alphabetically
-                return a.siteName.toLowerCase().localeCompare(b.siteName.toLowerCase());
-            });
-
-            // Create grid container
-            const gridContainer = document.createElement('div');
-            gridContainer.className = 'passwords-grid';
-            
-            toShow.forEach((item, index) => {
-                const actualIndex = passwords.indexOf(item);
-                const firstLetter = item.siteName.charAt(0).toUpperCase();
-                const isNew = newPasswordsThisSession.has(actualIndex);
-                
-                const div = document.createElement('div');
-                div.className = `password-item ${isNew ? 'new-password' : ''}`;
-                div.innerHTML = `
-                    <h3>
-                        <span class="site-icon">${firstLetter}</span>
-                        ${item.siteName}
-                        ${isNew ? '<span style="color: #27ae60; font-size: 0.8rem; margin-left: 5px;">NEW</span>' : ''}
-                    </h3>
-                    <p><strong>👤</strong> ${item.username}</p>
-                    <div class="password-display hidden" id="pass-${actualIndex}">
-                        <strong>🔑</strong> ${item.password}
-                    </div>
-                    <div class="quick-actions">
-                        <button class="btn btn-secondary" data-action="copy-username" data-value="${item.username}">📋 User</button>
-                        <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
-                        <button class="btn btn-secondary" data-action="toggle" data-index="${actualIndex}">👁️ Show</button>
-                        <button class="btn btn-danger" data-action="delete" data-index="${actualIndex}">🗑️</button>
-                    </div>
-                `;
-                
-                // Add event listeners to buttons
-                const buttons = div.querySelectorAll('button[data-action]');
-                buttons.forEach(button => {
-                    button.addEventListener('click', handlePasswordAction);
-                });
-                
-                gridContainer.appendChild(div);
-            });
-            
-            container.innerHTML = '';
-            container.appendChild(gridContainer);
-        }
-
-        function handlePasswordAction(event) {
-            const action = event.target.dataset.action;
-            const index = parseInt(event.target.dataset.index);
-            const value = event.target.dataset.value;
-            
-            switch (action) {
-                case 'toggle':
-                    togglePassword(index, event.target);
-                    break;
-                case 'copy-password':
-                    copyToClipboard(value, 'password');
-                    break;
-                case 'copy-username':
-                    copyToClipboard(value, 'username');
-                    break;
-                case 'delete':
-                    deletePasswordSafe(index);
-                    break;
-            }
-        }
-
-        function togglePassword(index, button) {
-            const element = document.getElementById(`pass-${index}`);
-            
-            if (element.classList.contains('hidden')) {
-                element.classList.remove('hidden');
-                button.textContent = '🙈 Hide';
-            } else {
-                element.classList.add('hidden');
-                button.textContent = '👁️ Show';
-            }
-        }
-
-        async function deletePasswordSafe(index) {
-            try {
-                if (!passwords[index]) {
-                    alert('Password not found');
-                    return;
-                }
-                
-                const siteName = passwords[index].siteName;
-                if (!confirm(`Delete password for ${siteName}?`)) return;
-
-                const deletedPassword = passwords.splice(index, 1)[0];
-                
-                // Remove from new passwords tracking
-                newPasswordsThisSession.delete(index);
-                
-                // Update indices for remaining new passwords
-                const updatedNewPasswords = new Set();
-                newPasswordsThisSession.forEach(idx => {
-                    if (idx > index) {
-                        updatedNewPasswords.add(idx - 1);
-                    } else if (idx < index) {
-                        updatedNewPasswords.add(idx);
-                    }
-                });
-                newPasswordsThisSession = updatedNewPasswords;
-                
-                await savePasswordsToGitHub();
-                displayPasswords();
-                showCopyFeedback('🗑️ Password deleted');
-                
-            } catch (error) {
-                console.error('Delete failed:', error);
-                alert('Failed to delete password. Please try again.');
-                
-                // Restore the password if it was removed
-                if (typeof deletedPassword !== 'undefined') {
-                    passwords.splice(index, 0, deletedPassword);
-                    displayPasswords();
-                }
-            }
-        }
-
-        async function copyToClipboard(text, type) {
-            try {
-                await navigator.clipboard.writeText(text);
-                showCopyFeedback(type === 'password' ? '🔑 Password copied!' : '👤 Username copied!');
-            } catch (error) {
-                alert('Failed to copy to clipboard');
-            }
-        }
-
-        function showCopyFeedback(message) {
-            const feedback = document.getElementById('copyFeedback');
-            feedback.textContent = message;
-            feedback.classList.add('show');
-            
-            setTimeout(() => {
-                feedback.classList.remove('show');
-            }, 2000);
-        }
-
-        // Auto-sync every 5 minutes
-        setInterval(() => {
-            if (masterKey && document.visibilityState === 'visible') {
-                syncNow();
-            }
-        }, 5 * 60 * 1000);
-
-        // Auto-lock after 15 minutes of inactivity
-        let inactivityTimer;
-        function resetInactivityTimer() {
-            clearTimeout(inactivityTimer);
-            if (masterKey) {
-                inactivityTimer = setTimeout(() => {
-                    logout();
-                    alert('🔒 Session expired due to inactivity.');
-                }, 15 * 60 * 1000);
-            }
-        }
-
-        document.addEventListener('click', resetInactivityTimer);
-        document.addEventListener('keypress', resetInactivityTimer);
-        document.addEventListener('touchstart', resetInactivityTimer);
-    </script>
+        out.push(entry);
+      }
+      return out;
+    }
+
+    function parseCSVLine(line){
+      const res=[]; let cur=''; let q=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch==='\"'){ q=!q; }
+        else if(ch===',' && !q){ res.push(cur.trim()); cur=''; }
+        else { cur+=ch; }
+      }
+      res.push(cur.trim());
+      return res;
+    }
+
+    // timers
+    setInterval(()=>{ if(masterKey && document.visibilityState==='visible'){ syncNow(); } }, 5*60*1000);
+
+    let inactivityTimer;
+    function resetInactivityTimer(){
+      clearTimeout(inactivityTimer);
+      if(masterKey){
+        inactivityTimer = setTimeout(()=>{
+          logout();
+          alert('Session expired due to inactivity.');
+        }, 15*60*1000);
+      }
+    }
+    document.addEventListener('click', resetInactivityTimer);
+    document.addEventListener('keypress', resetInactivityTimer);
+    document.addEventListener('touchstart', resetInactivityTimer);
+  </script>
 </body>
 </html>
