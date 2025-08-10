@@ -280,6 +280,8 @@
     let filteredPasswords = [];
     let lastSyncTime = null;
     let newPasswordsThisSession = new Set();
+    let isOperationInProgress = false; // Prevent concurrent operations
+    let lastSyncHash = ''; // Track changes to avoid unnecessary syncs
 
     // startup
     window.addEventListener('load', () => {
@@ -294,6 +296,16 @@
         document.getElementById('authSection').classList.remove('hidden');
       }
     });
+
+    // Helper function to generate unique IDs for passwords
+    function generatePasswordId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    // Helper function to calculate hash of passwords array for change detection
+    function calculatePasswordsHash() {
+      return btoa(JSON.stringify(passwords.map(p => ({ id: p.id, siteName: p.siteName, username: p.username, password: p.password }))));
+    }
 
     // ui helpers
     function togglePasswordVisibility(id){
@@ -399,14 +411,28 @@
     }
 
     async function loadPasswordsFromGitHub(){
+      if (isOperationInProgress) {
+        throw new Error('Operation already in progress');
+      }
+      
       try{
         updateSyncStatus('🔄 Syncing...','sync-offline');
         const file = await githubApiCall('contents/passwords.json');
         const raw = atob(file.content);
         const encrypted = JSON.parse(raw);
         const json = await decrypt(encrypted, masterKey);
-        passwords = JSON.parse(json);
+        const remotePasswords = JSON.parse(json);
+        
+        // Migrate old passwords to include IDs if they don't have them
+        remotePasswords.forEach(pwd => {
+          if (!pwd.id) {
+            pwd.id = generatePasswordId();
+          }
+        });
+        
+        passwords = remotePasswords;
         lastSyncTime = new Date();
+        lastSyncHash = calculatePasswordsHash();
         updateSyncStatus('🟢 Synced','sync-online');
         updateLastSyncTime();
       }catch(err){
@@ -422,8 +448,21 @@
     }
 
     async function savePasswordsToGitHub(){
+      if (isOperationInProgress) {
+        throw new Error('Operation already in progress');
+      }
+      
       try{
+        isOperationInProgress = true;
         updateSyncStatus('🔄 Saving...','sync-offline');
+        
+        // Ensure all passwords have IDs
+        passwords.forEach(pwd => {
+          if (!pwd.id) {
+            pwd.id = generatePasswordId();
+          }
+        });
+        
         const plaintext = JSON.stringify(passwords);
         const encrypted = await encrypt(plaintext, masterKey);
         const content = btoa(JSON.stringify(encrypted));
@@ -442,6 +481,7 @@
 
         await githubApiCall('contents/passwords.json', 'PUT', commit);
         lastSyncTime = new Date();
+        lastSyncHash = calculatePasswordsHash();
         updateSyncStatus('🟢 Synced','sync-online');
         updateLastSyncTime();
       }catch(err){
@@ -458,6 +498,7 @@
             };
             await githubApiCall('contents/passwords.json','PUT',retryCommit);
             lastSyncTime = new Date();
+            lastSyncHash = calculatePasswordsHash();
             updateSyncStatus('🟢 Synced','sync-online');
             updateLastSyncTime();
             return;
@@ -467,6 +508,8 @@
           }
         }
         throw err;
+      } finally {
+        isOperationInProgress = false;
       }
     }
 
@@ -619,15 +662,17 @@
       const btn = document.getElementById('addBtn');
       btn.disabled = true; btn.textContent='💾 Saving...';
       try{
-        passwords.push({
+        const newPassword = {
+          id: generatePasswordId(),
           siteName,
           siteUrl,
           username,
           password: pwd,
           dateAdded: new Date().toISOString()
-        });
-        const newIndex = passwords.length - 1;
-        newPasswordsThisSession.add(newIndex);
+        };
+        
+        passwords.push(newPassword);
+        newPasswordsThisSession.add(newPassword.id);
 
         await savePasswordsToGitHub();
         displayPasswords();
@@ -641,7 +686,7 @@
         document.getElementById('toggleAddBtn').textContent='➕ Add New Password';
       }catch(err){
         alert('Failed to save password. Please try again.');
-        passwords.pop();
+        passwords = passwords.filter(p => p.id !== newPassword.id);
       }finally{
         btn.disabled=false; btn.textContent='💾 Save';
       }
@@ -663,10 +708,8 @@
 
       // sort new first then alphabetical
       list = [...list].sort((a,b)=>{
-        const ia = passwords.indexOf(a);
-        const ib = passwords.indexOf(b);
-        const na = newPasswordsThisSession.has(ia);
-        const nb = newPasswordsThisSession.has(ib);
+        const na = newPasswordsThisSession.has(a.id);
+        const nb = newPasswordsThisSession.has(b.id);
         if(na && !nb) return -1;
         if(!na && nb) return 1;
         return a.siteName.toLowerCase().localeCompare(b.siteName.toLowerCase());
@@ -676,20 +719,19 @@
       grid.className='passwords-grid';
 
       list.forEach(item=>{
-        const idx = passwords.indexOf(item);
         const first = item.siteName.charAt(0).toUpperCase();
-        const isNew = newPasswordsThisSession.has(idx);
+        const isNew = newPasswordsThisSession.has(item.id);
         const div = document.createElement('div');
         div.className = 'password-item' + (isNew ? ' new-password' : '');
         div.innerHTML = `
           <h3><span class="site-icon">${first}</span>${item.siteName}${isNew ? '<span style="color:#27ae60;font-size:.8rem;margin-left:5px">NEW</span>':''}</h3>
           <p><strong>👤</strong> ${item.username}</p>
-          <div class="password-display hidden" id="pass-${idx}"><strong>🔑</strong> ${item.password}</div>
+          <div class="password-display hidden" id="pass-${item.id}"><strong>🔑</strong> ${item.password}</div>
           <div class="quick-actions">
             <button class="btn btn-secondary" data-action="copy-username" data-value="${item.username}">📋 User</button>
             <button class="btn btn-secondary" data-action="copy-password" data-value="${item.password}">📋 Pass</button>
-            <button class="btn btn-secondary" data-action="toggle" data-index="${idx}">👁️ Show</button>
-            <button class="btn btn-danger" data-action="delete" data-index="${idx}">🗑️</button>
+            <button class="btn btn-secondary" data-action="toggle" data-id="${item.id}">👁️ Show</button>
+            <button class="btn btn-danger" data-action="delete" data-id="${item.id}">🗑️</button>
           </div>
         `;
         div.querySelectorAll('button[data-action]').forEach(b=>b.addEventListener('click', handlePasswordAction));
@@ -702,37 +744,60 @@
 
     function handlePasswordAction(e){
       const action = e.target.dataset.action;
-      const idx = parseInt(e.target.dataset.index);
+      const id = e.target.dataset.id;
       const val = e.target.dataset.value;
-      if(action==='toggle') togglePassword(idx, e.target);
+      if(action==='toggle') togglePassword(id, e.target);
       else if(action==='copy-password') copyToClipboard(val,'password');
       else if(action==='copy-username') copyToClipboard(val,'username');
-      else if(action==='delete') deletePasswordSafe(idx);
+      else if(action==='delete') deletePasswordSafe(id);
     }
 
-    function togglePassword(index, button){
-      const el = document.getElementById(`pass-${index}`);
+    function togglePassword(id, button){
+      const el = document.getElementById(`pass-${id}`);
       if(!el) return;
       if(el.classList.contains('hidden')){ el.classList.remove('hidden'); button.textContent='🙈 Hide'; }
       else { el.classList.add('hidden'); button.textContent='👁️ Show'; }
     }
 
-    async function deletePasswordSafe(index){
-      if(!passwords[index]){ alert('Password not found'); return; }
-      const name = passwords[index].siteName;
+    async function deletePasswordSafe(passwordId){
+      if (isOperationInProgress) {
+        alert('Another operation is in progress. Please wait.');
+        return;
+      }
+      
+      const passwordIndex = passwords.findIndex(p => p.id === passwordId);
+      if(passwordIndex === -1){ 
+        alert('Password not found'); 
+        return; 
+      }
+      
+      const password = passwords[passwordIndex];
+      const name = password.siteName;
       if(!confirm(`Delete password for ${name}?`)) return;
 
-      let deleted;
       try{
-        deleted = passwords.splice(index,1)[0];
-        newPasswordsThisSession.delete(index);
+        isOperationInProgress = true;
+        
+        // Remove password from array
+        const deletedPassword = passwords.splice(passwordIndex, 1)[0];
+        newPasswordsThisSession.delete(passwordId);
+        
+        // Save to GitHub immediately
         await savePasswordsToGitHub();
+        
+        // Update display
         displayPasswords();
         showCopyFeedback('🗑️ Password deleted');
+        
       }catch(err){
         console.error('Delete failed', err);
         alert('Failed to delete password. Please try again.');
-        if(deleted){ passwords.splice(index,0,deleted); displayPasswords(); }
+        
+        // Restore the deleted password on error
+        passwords.splice(passwordIndex, 0, password);
+        displayPasswords();
+      } finally {
+        isOperationInProgress = false;
       }
     }
 
@@ -786,16 +851,34 @@
     }
 
     async function syncNow(){
+      if (isOperationInProgress) {
+        alert('Another operation is in progress. Please wait.');
+        return;
+      }
+      
       const btn = document.getElementById('syncBtn');
       btn.disabled=true; btn.textContent='🔄 Syncing...';
       try{
-        await loadPasswordsFromGitHub();
-        // sort for stable display
-        passwords.sort((a,b)=>a.siteName.toLowerCase().localeCompare(b.siteName.toLowerCase()));
+        // Check if we have local changes
+        const currentHash = calculatePasswordsHash();
+        const hasLocalChanges = currentHash !== lastSyncHash;
+        
+        if (hasLocalChanges) {
+          // Save local changes first
+          await savePasswordsToGitHub();
+          showCopyFeedback('🔄 Local changes saved');
+        } else {
+          // Load remote changes
+          await loadPasswordsFromGitHub();
+          showCopyFeedback('🔄 Synced with remote');
+        }
+        
+        // Clear new password indicators after successful sync
         newPasswordsThisSession.clear();
         displayPasswords();
-        showCopyFeedback('🔄 Synced and sorted');
-      }catch(_){
+        
+      }catch(err){
+        console.error('Sync failed', err);
         alert('Sync failed. Please check your internet connection.');
       }finally{
         btn.disabled=false; btn.textContent='🔄 Sync';
@@ -808,6 +891,7 @@
       passwords = [];
       filteredPasswords = [];
       lastSyncTime = null;
+      lastSyncHash = '';
       newPasswordsThisSession.clear();
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('mainSection').style.display='none';
@@ -843,8 +927,11 @@
         if(!confirm(`Import ${imported.length} passwords? They will be added to existing passwords.`)) return;
 
         const startLen = passwords.length;
+        imported.forEach(pwd => {
+          pwd.id = generatePasswordId();
+          newPasswordsThisSession.add(pwd.id);
+        });
         passwords.push(...imported);
-        for(let i=startLen;i<passwords.length;i++) newPasswordsThisSession.add(i);
 
         await savePasswordsToGitHub();
         displayPasswords();
@@ -920,8 +1007,23 @@
       return res;
     }
 
-    // timers
-    setInterval(()=>{ if(masterKey && document.visibilityState==='visible'){ syncNow(); } }, 5*60*1000);
+    // Enhanced timers with conflict detection
+    setInterval(()=>{ 
+      if(masterKey && document.visibilityState==='visible' && !isOperationInProgress){ 
+        const currentHash = calculatePasswordsHash();
+        if (currentHash !== lastSyncHash) {
+          // We have local changes, save them instead of loading
+          savePasswordsToGitHub().catch(err => {
+            console.error('Auto-save failed:', err);
+          });
+        } else {
+          // No local changes, safe to load remote updates
+          loadPasswordsFromGitHub().catch(err => {
+            console.error('Auto-sync failed:', err);
+          });
+        }
+      } 
+    }, 5*60*1000);
 
     let inactivityTimer;
     function resetInactivityTimer(){
