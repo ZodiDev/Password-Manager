@@ -410,11 +410,7 @@
       return res.json();
     }
 
-    async function loadPasswordsFromGitHub(){
-      if (isOperationInProgress) {
-        throw new Error('Operation already in progress');
-      }
-      
+    async function loadPasswordsFromGitHub(){      
       try{
         updateSyncStatus('🔄 Syncing...','sync-offline');
         const file = await githubApiCall('contents/passwords.json');
@@ -448,12 +444,7 @@
     }
 
     async function savePasswordsToGitHub(){
-      if (isOperationInProgress) {
-        throw new Error('Operation already in progress');
-      }
-      
       try{
-        isOperationInProgress = true;
         updateSyncStatus('🔄 Saving...','sync-offline');
         
         // Ensure all passwords have IDs
@@ -508,8 +499,6 @@
           }
         }
         throw err;
-      } finally {
-        isOperationInProgress = false;
       }
     }
 
