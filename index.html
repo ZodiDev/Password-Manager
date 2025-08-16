@@ -573,62 +573,106 @@
     }
 
     async function savePasswordsToGitHub(){
-      try{
-        updateSyncStatus('🔄 Saving...','sync-offline');
-        
-        // Ensure all passwords have IDs
-        passwords.forEach(pwd => {
-          if (!pwd.id) {
-            pwd.id = generatePasswordId();
-          }
-        });
-        
-        const plaintext = JSON.stringify(passwords);
-        const encrypted = await encrypt(plaintext, masterKey);
-        const content = btoa(JSON.stringify(encrypted));
-
-        let sha = null;
+      const maxRetries = 3;
+      let retryCount = 0;
+      
+      while(retryCount <= maxRetries) {
         try{
-          const existing = await githubApiCall('contents/passwords.json');
-          sha = existing.sha;
-        }catch(_){}
+          updateSyncStatus('🔄 Saving...','sync-offline');
+          
+          // Ensure all passwords have IDs
+          passwords.forEach(pwd => {
+            if (!pwd.id) {
+              pwd.id = generatePasswordId();
+            }
+          });
+          
+          const plaintext = JSON.stringify(passwords);
+          const encrypted = await encrypt(plaintext, masterKey);
+          const content = btoa(JSON.stringify(encrypted));
 
-        const commit = {
-          message: `Update passwords ${new Date().toISOString()}`,
-          content
-        };
-        if(sha) commit.sha = sha;
-
-        await githubApiCall('contents/passwords.json', 'PUT', commit);
-        lastSyncTime = new Date();
-        lastSyncHash = calculatePasswordsHash();
-        updateSyncStatus('🟢 Synced','sync-online');
-        updateLastSyncTime();
-      }catch(err){
-        console.error('Save failed', err);
-        updateSyncStatus('🔴 Sync Error','sync-offline');
-
-        if(String(err.message).includes('409') || String(err.message).includes('does not match')){
+          let sha = null;
           try{
-            const fresh = await githubApiCall('contents/passwords.json');
-            const retryCommit = {
-              message: `Update passwords ${new Date().toISOString()} retry`,
-              content: btoa(JSON.stringify(await encrypt(JSON.stringify(passwords), masterKey))),
-              sha: fresh.sha
-            };
-            await githubApiCall('contents/passwords.json','PUT',retryCommit);
-            lastSyncTime = new Date();
-            lastSyncHash = calculatePasswordsHash();
-            updateSyncStatus('🟢 Synced','sync-online');
-            updateLastSyncTime();
-            return;
-          }catch(retryErr){
-            console.error('Retry failed', retryErr);
+            const existing = await githubApiCall('contents/passwords.json');
+            sha = existing.sha;
+          }catch(_){}
+
+          const commit = {
+            message: `Update passwords ${new Date().toISOString()}${retryCount > 0 ? ` (retry ${retryCount})` : ''}`,
+            content
+          };
+          if(sha) commit.sha = sha;
+
+          await githubApiCall('contents/passwords.json', 'PUT', commit);
+          lastSyncTime = new Date();
+          lastSyncHash = calculatePasswordsHash();
+          updateSyncStatus('🟢 Synced','sync-online');
+          updateLastSyncTime();
+          return; // Success, exit the retry loop
+          
+        }catch(err){
+          console.error(`Save failed (attempt ${retryCount + 1}):`, err);
+          
+          if((String(err.message).includes('409') || String(err.message).includes('does not match')) && retryCount < maxRetries){
+            retryCount++;
+            console.log(`Retrying save operation (${retryCount}/${maxRetries})...`);
+            
+            // Wait a short time before retrying to avoid rapid-fire requests
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            
+            try{
+              // Fetch latest remote state
+              const remoteFile = await githubApiCall('contents/passwords.json');
+              const remoteRaw = atob(remoteFile.content);
+              const remoteEncrypted = JSON.parse(remoteRaw);
+              const remoteJson = await decrypt(remoteEncrypted, masterKey);
+              const remotePasswords = JSON.parse(remoteJson);
+              
+              // Merge remote passwords with local passwords
+              const mergedPasswords = mergePasswordArrays(remotePasswords, passwords);
+              passwords = mergedPasswords;
+              
+              console.log(`Merged ${remotePasswords.length} remote with ${passwords.length} local passwords`);
+              // Continue to next retry iteration with merged data
+              
+            }catch(mergeErr){
+              console.error('Failed to merge remote changes:', mergeErr);
+              // Continue with local data only
+            }
+          } else {
+            // Non-conflict error or max retries reached
             updateSyncStatus('🔴 Sync Error','sync-offline');
+            throw err;
           }
         }
-        throw err;
       }
+    }
+
+    // Helper function to intelligently merge password arrays
+    function mergePasswordArrays(remotePasswords, localPasswords) {
+      const merged = new Map();
+      
+      // Add all remote passwords first
+      remotePasswords.forEach(pwd => {
+        if (!pwd.id) pwd.id = generatePasswordId();
+        merged.set(pwd.id, pwd);
+      });
+      
+      // Add/update with local passwords
+      localPasswords.forEach(pwd => {
+        if (!pwd.id) pwd.id = generatePasswordId();
+        
+        const existing = merged.get(pwd.id);
+        if (!existing) {
+          // New local password, add it
+          merged.set(pwd.id, pwd);
+        } else {
+          // Password exists in both, prefer local version (local changes take precedence)
+          merged.set(pwd.id, pwd);
+        }
+      });
+      
+      return Array.from(merged.values());
     }
 
     // setup actions
@@ -902,27 +946,73 @@
 
       try{
         isOperationInProgress = true;
+        updateSyncStatus('🔄 Deleting...','sync-offline');
+        
+        // First, sync with remote to get latest state
+        try {
+          await loadPasswordsFromGitHub();
+          // Re-find the password after sync (index might have changed)
+          const updatedIndex = passwords.findIndex(p => p.id === passwordId);
+          if(updatedIndex === -1) {
+            showAlert('Password was already deleted or not found after sync.');
+            return;
+          }
+        } catch(syncErr) {
+          console.warn('Could not sync before delete, proceeding with local state:', syncErr);
+        }
         
         // Remove password from array
-        const deletedPassword = passwords.splice(passwordIndex, 1)[0];
+        const finalIndex = passwords.findIndex(p => p.id === passwordId);
+        if(finalIndex === -1) {
+          showAlert('Password not found after sync.');
+          return;
+        }
+        
+        const deletedPassword = passwords.splice(finalIndex, 1)[0];
         newPasswordsThisSession.delete(passwordId);
         
-        // Save to GitHub immediately
+        // Save to GitHub with improved conflict resolution
         await savePasswordsToGitHub();
         
         // Update display
         displayPasswords();
-        showCopyFeedback('🗑️ Password deleted');
+        showCopyFeedback('🗑️ Password deleted successfully');
         
       }catch(err){
-        console.error('Delete failed', err);
-        showAlert('Failed to delete password. Please try again.');
+        console.error('Delete operation failed:', err);
         
-        // Restore the deleted password on error
-        passwords.splice(passwordIndex, 0, password);
-        displayPasswords();
+        // Provide more specific error messages
+        let errorMessage = 'Failed to delete password. ';
+        if(String(err.message).includes('409')) {
+          errorMessage += 'There was a sync conflict. Please try again.';
+        } else if(String(err.message).includes('403')) {
+          errorMessage += 'Permission denied. Check your GitHub token.';
+        } else if(String(err.message).includes('404')) {
+          errorMessage += 'Repository not found. Check your GitHub settings.';
+        } else {
+          errorMessage += 'Please check your internet connection and try again.';
+        }
+        
+        showAlert(errorMessage);
+        
+        // Attempt to restore the password
+        try {
+          // Reload from GitHub to get the current state
+          await loadPasswordsFromGitHub();
+          displayPasswords();
+          showCopyFeedback('⚠️ Delete failed - data restored from sync');
+        } catch(restoreErr) {
+          console.error('Failed to restore from GitHub:', restoreErr);
+          // As last resort, restore the deleted password locally
+          if(password) {
+            passwords.splice(Math.max(0, passwordIndex), 0, password);
+            displayPasswords();
+            showCopyFeedback('⚠️ Delete failed - password restored locally');
+          }
+        }
       } finally {
         isOperationInProgress = false;
+        updateSyncStatus('🟢 Ready','sync-online');
       }
     }
 
@@ -983,19 +1073,59 @@
       
       const btn = document.getElementById('syncBtn');
       btn.disabled=true; btn.textContent='🔄 Syncing...';
+      
       try{
+        isOperationInProgress = true;
+        
         // Check if we have local changes
         const currentHash = calculatePasswordsHash();
         const hasLocalChanges = currentHash !== lastSyncHash;
         
         if (hasLocalChanges) {
-          // Save local changes first
-          await savePasswordsToGitHub();
-          showCopyFeedback('🔄 Local changes saved');
+          // We have local changes - need to merge with remote
+          updateSyncStatus('🔄 Merging changes...','sync-offline');
+          
+          try {
+            // First get remote state
+            const remoteFile = await githubApiCall('contents/passwords.json');
+            const remoteRaw = atob(remoteFile.content);
+            const remoteEncrypted = JSON.parse(remoteRaw);
+            const remoteJson = await decrypt(remoteEncrypted, masterKey);
+            const remotePasswords = JSON.parse(remoteJson);
+            
+            // Merge remote with local
+            const originalLocal = [...passwords];
+            passwords = mergePasswordArrays(remotePasswords, passwords);
+            
+            // Save merged result
+            await savePasswordsToGitHub();
+            
+            const addedCount = passwords.length - originalLocal.length;
+            if(addedCount > 0) {
+              showCopyFeedback(`🔄 Synced - ${addedCount} new passwords from remote`);
+            } else {
+              showCopyFeedback('🔄 Local changes saved to remote');
+            }
+            
+          } catch(mergeErr) {
+            console.warn('Could not merge with remote, saving local changes only:', mergeErr);
+            // Just save local changes
+            await savePasswordsToGitHub();
+            showCopyFeedback('🔄 Local changes saved');
+          }
         } else {
-          // Load remote changes
+          // No local changes, safe to load remote updates
+          const originalCount = passwords.length;
           await loadPasswordsFromGitHub();
-          showCopyFeedback('🔄 Synced with remote');
+          
+          const newCount = passwords.length - originalCount;
+          if(newCount > 0) {
+            showCopyFeedback(`🔄 Synced - ${newCount} new passwords loaded`);
+          } else if(newCount < 0) {
+            showCopyFeedback(`🔄 Synced - ${Math.abs(newCount)} passwords removed remotely`);
+          } else {
+            showCopyFeedback('🔄 Already up to date');
+          }
         }
         
         // Clear new password indicators after successful sync
@@ -1004,9 +1134,22 @@
         
       }catch(err){
         console.error('Sync failed', err);
-        showAlert('Sync failed. Please check your internet connection.');
+        
+        let errorMessage = 'Sync failed. ';
+        if(String(err.message).includes('403')) {
+          errorMessage += 'Check your GitHub token permissions.';
+        } else if(String(err.message).includes('404')) {
+          errorMessage += 'Repository not found.';
+        } else {
+          errorMessage += 'Check your internet connection.';
+        }
+        
+        showAlert(errorMessage);
+        updateSyncStatus('🔴 Sync Error','sync-offline');
       }finally{
-        btn.disabled=false; btn.textContent='🔄 Sync';
+        isOperationInProgress = false;
+        btn.disabled=false; 
+        btn.textContent='🔄 Sync';
       }
     }
 
