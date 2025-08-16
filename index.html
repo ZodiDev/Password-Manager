@@ -79,6 +79,70 @@
     .steps li{margin-bottom:8px;font-size:.9rem}
     .copy-feedback{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(39,174,96,.95);color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;z-index:1000;opacity:0;transition:opacity .3s}
     .copy-feedback.show{opacity:1}
+    
+    /* Custom Confirmation Dialog */
+    .custom-confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .custom-confirm-dialog {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+    .custom-confirm-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 15px;
+    }
+    .custom-confirm-message {
+      color: #7f8c8d;
+      margin-bottom: 25px;
+      line-height: 1.5;
+    }
+    .custom-confirm-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .custom-confirm-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .custom-confirm-btn.cancel {
+      background: #ecf0f1;
+      color: #7f8c8d;
+    }
+    .custom-confirm-btn.cancel:hover {
+      background: #d5dbdb;
+    }
+    .custom-confirm-btn.delete {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: white;
+    }
+    .custom-confirm-btn.delete:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+    }
+    
     @media (max-width:480px){
       body{padding:5px}
       .container{border-radius:15px;max-width:100%}
@@ -89,6 +153,7 @@
       .form-row .form-group{margin-bottom:12px}
       .quick-actions{grid-template-columns:1fr 1fr}
       .password-item{padding:12px}
+      .custom-confirm-dialog{padding:20px;margin:10px}
     }
     @media (prefers-color-scheme:dark){
       .container{background:rgba(45,52,65,.95);color:#e9ecef}
@@ -104,6 +169,11 @@
       label{color:#e9ecef}
       .info{background:rgba(59,130,246,.2);color:#dbeafe;border-left:4px solid #3b82f6}
       .warning{background:rgba(245,158,11,.2);color:#fef3c7;border-left:4px solid #f59e0b}
+      .custom-confirm-dialog{background:rgba(45,52,65,.98);color:#e9ecef}
+      .custom-confirm-title{color:#e9ecef}
+      .custom-confirm-message{color:#cbd5e0}
+      .custom-confirm-btn.cancel{background:rgba(75,85,99,.9);color:#cbd5e0}
+      .custom-confirm-btn.cancel:hover{background:rgba(55,65,81,.9)}
     }
   </style>
 </head>
@@ -307,6 +377,65 @@
       return btoa(JSON.stringify(passwords.map(p => ({ id: p.id, siteName: p.siteName, username: p.username, password: p.password }))));
     }
 
+    // Custom confirmation dialog for Android WebView compatibility
+    function showCustomConfirm(title, message) {
+      return new Promise((resolve) => {
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-confirm-overlay';
+        
+        // Create dialog
+        const dialog = document.createElement('div');
+        dialog.className = 'custom-confirm-dialog';
+        
+        dialog.innerHTML = `
+          <div class="custom-confirm-title">${title}</div>
+          <div class="custom-confirm-message">${message}</div>
+          <div class="custom-confirm-buttons">
+            <button class="custom-confirm-btn cancel">Cancel</button>
+            <button class="custom-confirm-btn delete">Delete</button>
+          </div>
+        `;
+        
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        
+        // Handle button clicks
+        const cancelBtn = dialog.querySelector('.cancel');
+        const deleteBtn = dialog.querySelector('.delete');
+        
+        const cleanup = () => {
+          document.body.removeChild(overlay);
+        };
+        
+        cancelBtn.addEventListener('click', () => {
+          cleanup();
+          resolve(false);
+        });
+        
+        deleteBtn.addEventListener('click', () => {
+          cleanup();
+          resolve(true);
+        });
+        
+        // Handle click outside dialog
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) {
+            cleanup();
+            resolve(false);
+          }
+        });
+        
+        // Focus on delete button for keyboard users
+        setTimeout(() => deleteBtn.focus(), 100);
+      });
+    }
+
+    // WebView-compatible alert function
+    function showAlert(message) {
+      showCopyFeedback(message);
+    }
+
     // ui helpers
     function togglePasswordVisibility(id){
       const input = document.getElementById(id);
@@ -507,7 +636,7 @@
       const username = document.getElementById('githubUsername').value.trim();
       const repo = document.getElementById('repoName').value.trim();
       const token = document.getElementById('githubToken').value.trim();
-      if(!username || !repo || !token){ alert('Please fill in all fields first'); return; }
+      if(!username || !repo || !token){ showAlert('Please fill in all fields first'); return; }
 
       const original = githubConfig;
       githubConfig = {username, repo, token};
@@ -535,13 +664,13 @@
         });
 
         updateSyncStatus('✅ Connected','sync-online');
-        alert('Connection successful. You can now save configuration.');
+        showAlert('Connection successful. You can now save configuration.');
         localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
         document.getElementById('setupSection').style.display='none';
         document.getElementById('createPasswordSection').classList.remove('hidden');
       }catch(err){
         console.error('Connection test failed', err);
-        alert(`Connection failed ${err.message}`);
+        showAlert(`Connection failed ${err.message}`);
         updateSyncStatus('❌ Failed','sync-offline');
       }finally{
         if(!githubConfig) githubConfig = original;
@@ -552,8 +681,8 @@
       const username = document.getElementById('githubUsername').value.trim();
       const repo = document.getElementById('repoName').value.trim();
       const token = document.getElementById('githubToken').value.trim();
-      if(!username || !repo || !token){ alert('Please fill in all fields'); return; }
-      if(username.includes(' ') || repo.includes(' ')){ alert('Username and repository cannot contain spaces'); return; }
+      if(!username || !repo || !token){ showAlert('Please fill in all fields'); return; }
+      if(username.includes(' ') || repo.includes(' ')){ showAlert('Username and repository cannot contain spaces'); return; }
 
       githubConfig = {username, repo, token};
       localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
@@ -580,7 +709,7 @@
       const username = document.getElementById('githubUsername').value.trim();
       const repo = document.getElementById('repoName').value.trim();
       const token = document.getElementById('githubToken').value.trim();
-      if(!username || !repo || !token){ alert('Please fill in all GitHub fields first'); return; }
+      if(!username || !repo || !token){ showAlert('Please fill in all GitHub fields first'); return; }
       githubConfig = {username, repo, token};
       localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
       document.getElementById('setupSection').style.display='none';
@@ -592,9 +721,9 @@
     async function createMasterPassword(){
       const pwd = document.getElementById('newMasterPassword').value;
       const confirm = document.getElementById('confirmMasterPassword').value;
-      if(!pwd || !confirm){ alert('Please fill in both password fields'); return; }
-      if(pwd !== confirm){ alert('Passwords do not match'); return; }
-      if(pwd.length < 8){ alert('Master password must be at least 8 characters long'); return; }
+      if(!pwd || !confirm){ showAlert('Please fill in both password fields'); return; }
+      if(pwd !== confirm){ showAlert('Passwords do not match'); return; }
+      if(pwd.length < 8){ showAlert('Master password must be at least 8 characters long'); return; }
 
       const btn = document.getElementById('createBtn');
       btn.disabled = true; btn.textContent = '🔄 Creating Vault...';
@@ -611,7 +740,7 @@
         document.getElementById('confirmMasterPassword').value='';
         displayPasswords();
       }catch(err){
-        alert('Failed to create vault. Please try again.');
+        showAlert('Failed to create vault. Please try again.');
         console.error(err);
       }finally{
         btn.disabled=false; btn.textContent='🔑 Create Vault';
@@ -620,7 +749,7 @@
 
     async function authenticate(){
       const pwd = document.getElementById('masterPassword').value;
-      if(!pwd){ alert('Please enter a master password'); return; }
+      if(!pwd){ showAlert('Please enter a master password'); return; }
       const btn = document.getElementById('unlockBtn');
       btn.disabled=true; btn.textContent='🔄 Unlocking...';
       try{
@@ -633,7 +762,7 @@
         document.getElementById('masterPassword').value='';
         displayPasswords();
       }catch(err){
-        alert('Failed to unlock vault. Please check your master password.');
+        showAlert('Failed to unlock vault. Please check your master password.');
         console.error(err);
       }finally{
         btn.disabled=false; btn.textContent='🔓 Unlock Vault';
@@ -646,7 +775,7 @@
       const siteUrl = document.getElementById('siteUrl').value.trim();
       const username = document.getElementById('username').value.trim();
       const pwd = document.getElementById('password').value;
-      if(!siteName || !username || !pwd){ alert('Please fill in site name, username, and password'); return; }
+      if(!siteName || !username || !pwd){ showAlert('Please fill in site name, username, and password'); return; }
 
       const btn = document.getElementById('addBtn');
       btn.disabled = true; btn.textContent='💾 Saving...';
@@ -674,7 +803,7 @@
         document.getElementById('addPasswordForm').classList.add('hidden');
         document.getElementById('toggleAddBtn').textContent='➕ Add New Password';
       }catch(err){
-        alert('Failed to save password. Please try again.');
+        showAlert('Failed to save password. Please try again.');
         passwords = passwords.filter(p => p.id !== newPassword.id);
       }finally{
         btn.disabled=false; btn.textContent='💾 Save';
@@ -750,19 +879,26 @@
 
     async function deletePasswordSafe(passwordId){
       if (isOperationInProgress) {
-        alert('Another operation is in progress. Please wait.');
+        showAlert('Another operation is in progress. Please wait.');
         return;
       }
       
       const passwordIndex = passwords.findIndex(p => p.id === passwordId);
       if(passwordIndex === -1){ 
-        alert('Password not found'); 
+        showAlert('Password not found'); 
         return; 
       }
       
       const password = passwords[passwordIndex];
       const name = password.siteName;
-      if(!confirm(`Delete password for ${name}?`)) return;
+      
+      // Use custom confirmation dialog instead of native confirm()
+      const confirmed = await showCustomConfirm(
+        '🗑️ Delete Password',
+        `Are you sure you want to delete the password for "${name}"? This action cannot be undone.`
+      );
+      
+      if(!confirmed) return;
 
       try{
         isOperationInProgress = true;
@@ -780,7 +916,7 @@
         
       }catch(err){
         console.error('Delete failed', err);
-        alert('Failed to delete password. Please try again.');
+        showAlert('Failed to delete password. Please try again.');
         
         // Restore the deleted password on error
         passwords.splice(passwordIndex, 0, password);
@@ -795,7 +931,7 @@
         await navigator.clipboard.writeText(text);
         showCopyFeedback(type==='password' ? '🔑 Password copied!' : '👤 Username copied!');
       }catch(_){
-        alert('Failed to copy to clipboard');
+        showAlert('Failed to copy to clipboard');
       }
     }
 
@@ -841,7 +977,7 @@
 
     async function syncNow(){
       if (isOperationInProgress) {
-        alert('Another operation is in progress. Please wait.');
+        showAlert('Another operation is in progress. Please wait.');
         return;
       }
       
@@ -868,14 +1004,20 @@
         
       }catch(err){
         console.error('Sync failed', err);
-        alert('Sync failed. Please check your internet connection.');
+        showAlert('Sync failed. Please check your internet connection.');
       }finally{
         btn.disabled=false; btn.textContent='🔄 Sync';
       }
     }
 
-    function logout(){
-      if(!confirm('Lock your vault? You will need to enter your master password again.')) return;
+    async function logout(){
+      const confirmed = await showCustomConfirm(
+        '🔒 Lock Vault',
+        'Lock your vault? You will need to enter your master password again.'
+      );
+      
+      if(!confirmed) return;
+      
       masterKey = null;
       passwords = [];
       filteredPasswords = [];
@@ -890,7 +1032,13 @@
     }
 
     function resetConfig(){
-      if(!confirm('Reset GitHub configuration? You will need to set it up again.')) return;
+      const confirmed = showCustomConfirm(
+        '⚠️ Reset Configuration',
+        'Reset GitHub configuration? You will need to set it up again.'
+      );
+      
+      if(!confirmed) return;
+      
       localStorage.removeItem('githubConfig');
       githubConfig = null;
       location.reload();
@@ -909,11 +1057,16 @@
         const imported = parseCSV(text);
 
         if(imported.length===0){
-          alert('No valid rows found. Expected headers: name,website,username,secondary_username,password,notes');
+          showAlert('No valid rows found. Expected headers: name,website,username,secondary_username,password,notes');
           return;
         }
 
-        if(!confirm(`Import ${imported.length} passwords? They will be added to existing passwords.`)) return;
+        const confirmed = await showCustomConfirm(
+          '📥 Import CSV',
+          `Import ${imported.length} passwords? They will be added to existing passwords.`
+        );
+        
+        if(!confirmed) return;
 
         const startLen = passwords.length;
         imported.forEach(pwd => {
@@ -927,12 +1080,12 @@
         showCopyFeedback('📥 CSV imported');
       }catch(err){
         console.error('Import failed', err);
-        alert('Import failed. Please check file format and try again.');
+        showAlert('Import failed. Please check file format and try again.');
       }
     }
 
     function exportCSV(){
-      if(passwords.length===0){ alert('No passwords to export'); return; }
+      if(passwords.length===0){ showAlert('No passwords to export'); return; }
       const csv = [
         'name,website,username,password,notes',
         ...passwords.map(p=>{
@@ -1020,7 +1173,7 @@
       if(masterKey){
         inactivityTimer = setTimeout(()=>{
           logout();
-          alert('Session expired due to inactivity.');
+          showAlert('Session expired due to inactivity.');
         }, 15*60*1000);
       }
     }
